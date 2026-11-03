@@ -1,0 +1,14 @@
+# Static fixture paired with the unrestricted provider in main.tf; never deploy.
+name: Unrestricted WIF example
+on: [push]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  authenticate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/123456789/locations/global/workloadIdentityPools/github/providers/unrestricted
+          service_account: 123456789-compute@developer.gserviceaccount.com

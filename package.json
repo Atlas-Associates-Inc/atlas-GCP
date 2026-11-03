@@ -1,0 +1,16 @@
+{
+  "name": "@atlas-sec/shield",
+  "version": "0.1.0",
+  "description": "Offline GCP and Firebase attack graph analysis with a read-only MCP airlock",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": { "node": ">=22.18.0" },
+  "bin": { "atlas-shield": "./bin/atlas-shield.mjs" },
+  "files": ["bin/", "src/", "LICENSE", "README.md", "action.yml"],
+  "scripts": {
+    "check": "node src/cli.ts --help",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -1,0 +1,16 @@
+{
+  "resource": "projects/atlas-fixture",
+  "bindings": [
+    {
+      "role": "roles/secretmanager.secretAccessor",
+      "members": [
+        "serviceAccount:123456789-compute@developer.gserviceaccount.com",
+        "serviceAccount:vault-reader@atlas-fixture.iam.gserviceaccount.com"
+      ]
+    },
+    {
+      "role": "roles/bigquery.dataEditor",
+      "members": ["serviceAccount:123456789-compute@developer.gserviceaccount.com"]
+    }
+  ]
+}

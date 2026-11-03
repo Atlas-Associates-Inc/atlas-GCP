@@ -1,0 +1,9 @@
+{
+  "resource": "projects/atlas-fixture",
+  "bindings": [
+    {
+      "role": "projects/atlas-fixture/roles/runtimeLogWriter",
+      "members": ["serviceAccount:api-runtime@atlas-fixture.iam.gserviceaccount.com"]
+    }
+  ]
+}

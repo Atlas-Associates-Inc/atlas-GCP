@@ -64,6 +64,17 @@ export interface AirlockDecision {
   reason: string;
 }
 
+export type AirlockProfileId = 'scc' | 'secops' | 'firebase' | 'cloudrun' | 'developer-knowledge' | 'prowler' | 'semgrep';
+export type McpConfigClient = 'agy' | 'gemini';
+
+export interface AirlockProfile {
+  id: AirlockProfileId;
+  description: string;
+  upstreamCommand: string;
+  upstreamArgs: readonly string[];
+  allowedTokens: readonly string[];
+}
+
 export interface SanitizedTelemetry {
   text: string;
   redactions: number;

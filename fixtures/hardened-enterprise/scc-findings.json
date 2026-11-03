@@ -1,0 +1,17 @@
+{
+  "findings": [
+    {
+      "category": "PUBLIC_CLOUD_RUN_SERVICE",
+      "resourceName": "//run.googleapis.com/projects/atlas-fixture/locations/us-central1/services/api",
+      "state": "INACTIVE",
+      "severity": "HIGH"
+    },
+    {
+      "category": "PUBLIC_BUCKET_ACL",
+      "resourceName": "//storage.googleapis.com/buckets/reviewed-fixture-bucket",
+      "state": "ACTIVE",
+      "mute": "MUTED",
+      "severity": "HIGH"
+    }
+  ]
+}

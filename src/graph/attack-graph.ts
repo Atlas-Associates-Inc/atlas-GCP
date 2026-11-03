@@ -4,6 +4,8 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import type { AttackPath, GraphEdge, GraphNode, GraphResult, Severity } from '../types.ts';
 import { addFinding, buildBraceMap, createLineIndex, emptyGraph, parseFirebaseConfig, parseFirebaseRules, stripHclCommentsAndHeredocs } from './firebase-rules-parser.ts';
 import { parseIamPolicy, parseTerraform, parseWifWorkflow, scanTerraformBlocks } from './gcp-iam-parser.ts';
+import { parseAuditLogs } from './audit-log-parser.ts';
+import { parseSccFindings } from './scc-findings-parser.ts';
 
 const rank: Record<Severity, number> = { blocker: 0, high: 1, medium: 2, low: 3, info: 4 };
 const compare = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
@@ -185,7 +187,7 @@ function correlateResources(graph: GraphResult, declarations: TerraformResource[
   graph.edges = graph.edges.filter(edge => !serviceIds.has(edge.from) || edge.kind !== 'potential-runtime-identity-access');
   const grantsByTarget = new Map<string, GraphEdge[]>(), grantsBySource = new Map<string, GraphEdge[]>();
   for (const edge of graph.edges) {
-    if (edge.kind !== 'iam-grant') continue;
+    if (edge.kind !== 'iam-grant' && edge.kind !== 'scc-public-exposure') continue;
     const targets = grantsByTarget.get(edge.to) ?? [];
     targets.push(edge);
     grantsByTarget.set(edge.to, targets);
@@ -213,7 +215,7 @@ function correlateResources(graph: GraphResult, declarations: TerraformResource[
       const aliases = new Set([`resource:${suffix}`, `resource://${service.family}.googleapis.com/${suffix}`]);
       for (const alias of aliases) {
         for (const edge of grantsByTarget.get(alias) ?? []) {
-          if (edge.to === alias && / -> roles\/(?:run|cloudfunctions)\.invoker on /.test(edge.evidence)) edge.to = service.id;
+          if (edge.to === alias && (edge.kind === 'scc-public-exposure' || / -> roles\/(?:run|cloudfunctions)\.invoker on /.test(edge.evidence))) edge.to = service.id;
         }
         grantsByTarget.delete(alias);
       }
@@ -324,6 +326,18 @@ export function readSafeSource(directory: string, file: string, remainingBytes =
   } finally { if (fd !== undefined) closeSync(fd); }
 }
 
+export function isAuditLogFilename(name: string): boolean {
+  if (!/\.(?:nd)?json$/i.test(name)) return false;
+  if (/(?:^|\.)audit\.(?:nd)?json$/i.test(name)) return true;
+  const stem = name.replace(/\.(?:nd)?json$/i, '');
+  // Keep the trailing boundary case-sensitive so words such as auditorium stay unrelated.
+  return /(?:^|[-_.\s])(?:[Cc][Ll][Oo][Uu][Dd][-_.]?[Aa][Uu][Dd][Ii][Tt](?:[-_.]?[Ll][Oo][Gg][Ss]?)?|[Aa][Uu][Dd][Ii][Tt][-_.]?[Ll][Oo][Gg][Ss]?)(?=[-_.\sA-Z0-9]|$)|[a-z0-9](?:CloudAudit(?:Logs?)?|AuditLogs?)(?=[-_.\sA-Z0-9]|$)/.test(stem);
+}
+
+export function isSccFindingsFilename(name: string): boolean {
+  return /\.json$/i.test(name) && /(?:^|[-_.\s])[Ss][Cc][Cc](?=[-_.\sA-Z0-9]|$)|[a-z0-9](?:Scc|SCC)(?=[-_.\sA-Z0-9]|$)/.test(name.replace(/\.json$/i, ''));
+}
+
 /** Offline scan. Symlinks are deliberately not followed, including config references. */
 export function scanDirectory(directory: string): GraphResult {
   const diagnostics = emptyGraph(), graphs: GraphResult[] = [diagnostics];
@@ -400,6 +414,8 @@ export function scanDirectory(directory: string): GraphResult {
     const ruleKind = ruleFiles.get(file) ?? (/^(?:firestore|storage)\.rules$|\.(?:firestore|storage)\.rules\.sample$/.test(name)
       ? name.includes('storage.rules') ? 'storage' : 'firestore' : undefined);
     const parser = ruleKind ? (source: string) => parseFirebaseRules(source, file, ruleKind)
+      : isAuditLogFilename(name) ? (source: string) => parseAuditLogs(source, file)
+      : isSccFindingsFilename(name) ? (source: string) => parseSccFindings(source, file)
       : /(?:^|[-_.\s])[Ii][Aa][Mm](?=[-_.\sA-Z0-9])|[a-z0-9](?:Iam|IAM)(?=[-_.\sA-Z0-9])/.test(name) && /\.json$/i.test(name)
         ? (source: string) => parseIamPolicy(source, file)
       : name.endsWith('.tf') ? (source: string) => {

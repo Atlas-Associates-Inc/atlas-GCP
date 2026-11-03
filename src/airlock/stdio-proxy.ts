@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process';
 import { evaluateTool, isReadOnlyTool } from './mcp-guard.ts';
+import { getAirlockProfile } from './profiles.ts';
 import { mapObject, redactSecrets, sanitizeTelemetry } from './sanitizer.ts';
 
 export interface StdioProxyOptions {
   command: string;
   args: string[];
+  profile?: string;
   input?: NodeJS.ReadableStream;
   output?: NodeJS.WritableStream;
   env?: NodeJS.ProcessEnv;
@@ -181,6 +183,10 @@ export async function runStdioProxy(options: StdioProxyOptions): Promise<number>
     output.on('error', onOutputError);
     cleanup.push(() => input.removeListener('error', onInputError), () => output.removeListener('error', onOutputError));
 
+    if (options.profile !== undefined && !getAirlockProfile(options.profile)) {
+      fail('Unknown airlock profile.');
+      return;
+    }
     if (typeof options.command !== 'string' || !options.command || options.command.includes('\0')
       || !Array.isArray(options.args) || !options.args.every(arg => typeof arg === 'string' && !arg.includes('\0'))) {
       fail('Invalid upstream command configuration.');
@@ -274,7 +280,7 @@ export async function runStdioProxy(options: StdioProxyOptions): Promise<number>
       }
       if (!requests.has(message.method) || pending.size >= MAX_PENDING
         || [...pending.values()].some(item => item.id === id)) { await deny(); return; }
-      if (message.method === 'tools/call' && (!evaluateTool(params.name).allowed
+      if (message.method === 'tools/call' && (!evaluateTool(params.name, options.profile).allowed
         || Object.keys(params).some(key => !['name', 'arguments', '_meta'].includes(key))
         || params.arguments !== undefined && (!object(params.arguments) || !safeArguments(params.arguments)))) {
         await deny(); return;
@@ -327,7 +333,7 @@ export async function runStdioProxy(options: StdioProxyOptions): Promise<number>
         payload = message.error;
       } else if (item.method === 'tools/list') {
         if (!object(payload) || !Array.isArray(payload.tools)) throw new Error('Invalid tools list.');
-        payload = { ...payload, tools: payload.tools.filter(tool => object(tool) && isReadOnlyTool(tool.name)
+        payload = { ...payload, tools: payload.tools.filter(tool => object(tool) && isReadOnlyTool(tool.name, options.profile)
           && redactSecrets(tool.name) === tool.name && !sanitizeTelemetry(tool.name).quarantined) };
       }
       const safe = cleanPayload(payload);

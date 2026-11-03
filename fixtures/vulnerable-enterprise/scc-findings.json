@@ -1,0 +1,17 @@
+{
+  "findings": [
+    {
+      "name": "organizations/123456789/sources/100/findings/public-worker",
+      "category": "PUBLIC_CLOUD_FUNCTION",
+      "resourceName": "//cloudfunctions.googleapis.com/projects/atlas-fixture/locations/us-central1/functions/worker",
+      "state": "ACTIVE",
+      "severity": "HIGH"
+    },
+    {
+      "category": "PUBLIC_BUCKET_ACL",
+      "resourceName": "//storage.googleapis.com/buckets/remediated-fixture-bucket",
+      "state": "INACTIVE",
+      "severity": "HIGH"
+    }
+  ]
+}

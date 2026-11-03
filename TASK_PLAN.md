@@ -58,3 +58,51 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
 ## Acceptance Criteria
 1. `npm run check` (exits `0`)
 2. `npm test` (exits `0`)
+
+---
+
+## Phase 2 Frozen Order (`@atlas-sec/shield` v0.2.0 — Airlock Profiles, Cloud Audit Threat Hunting & SCC Correlation)
+
+### Phase 2 Scope & Non-Goals
+- **Zero New Subdirectories**: Place all new source, fixture, and test files inside existing directories (`src/airlock/`, `src/graph/`, `src/report/`, `fixtures/vulnerable-enterprise/`, `fixtures/hardened-enterprise/`, `test/`).
+- **Zero External npm Dependencies**: Maintain `"dependencies": {}` and `"devDependencies": {}` in `package.json` (`version: "0.2.0"`), updating `"files"` only if needed (already covers `bin/`, `src/`, `LICENSE`, `README.md`, `action.yml`).
+- **Zero Claude / Lightweight Models**: `mcp-config` and all docs/profiles target only `--client agy|gemini` (never Claude Desktop or Anthropic tools) and sovereign models.
+- **Strict `<1 MiB` Linear `O(N)` Time & `256 MiB` Heap Bounds**: Every new parser (`audit-log-parser.ts`, `scc-findings-parser.ts`) must enforce bounded record/field sizes, `O(N)` complexity (`< 350 ms` on `< 1 MiB` dense inputs), secret redaction + BiDi/control stripping on untrusted telemetry fields, and fail-closed `scan/invalid-input` / `scan/input-limit` diagnostics.
+
+### Phase 2 Task List
+
+- [x] **Task-7: Hardened L1 Airlock Server Profiles & Read-Only `mcp-config` Generator**
+  - **Target Files**: `src/types.ts`, `src/airlock/profiles.ts`, `src/airlock/mcp-guard.ts`, `src/airlock/stdio-proxy.ts`, `src/cli.ts`
+  - **Scope**:
+    - Define curated zero-trust read-only Airlock profiles (`scc`, `secops`, `firebase`, `cloudrun`, `developer-knowledge`, `prowler`, `semgrep`) in `src/airlock/profiles.ts` with strict per-profile tool-name patterns (layered on top of `isReadOnlyTool()` — both must pass!), recommended upstream command templates, and required read-only flags.
+    - Add `--profile <name>` to `atlas-shield airlock` (`runStdioProxy`) so `tools/list` and `tools/call` reject any tool outside the selected profile's allowlist with JSON-RPC error `-32600`.
+    - Add `atlas-shield mcp-config [--profile <name>...] [--client agy|gemini]` emitting non-mutating JSON configuration to `stdout` that wraps each selected upstream MCP server in `atlas-shield airlock --profile <name> --upstream-cmd ...`.
+  - **Do Not**: Write to user home directories (`~/.gemini`, etc.), execute upstream commands during `mcp-config`, or include Claude/Anthropic client formats.
+
+- [x] **Task-8: Cloud Audit Logs Threat-Hunting Parser & Runtime Attack-Graph Correlation**
+  - **Target Files**: `src/graph/audit-log-parser.ts`, `src/graph/attack-graph.ts`, `src/report/remediation.ts`
+  - **Scope**:
+    - Parse exported GCP Cloud Audit Logs in JSON array (`[...]`), `{ entries: [...] }`, or NDJSON line format (`*.audit.json`, `*.audit.ndjson`, and token/camelCase-bounded `*cloudaudit*.json`, `*audit-logs*.json`, `*audit_logs*.json` — never matching unrelated filenames like `plaudit.json`!).
+    - Detect and graph-correlate four high-severity attack classes with bounded field lengths (`<= 512` chars) and `<= 10,000` records per file:
+      1. `audit/logging-tampering` (`blocker` for `DeleteSink` / `UpdateSink` disabling sink or removing `auditConfigs`; `high` for suspicious exclusion filter changes).
+      2. `audit/iam-persistence` (`high` for `CreateServiceAccountKey`, `CreateWorkloadIdentityPoolProvider` / `UpdateWorkloadIdentityPoolProvider` without `attributeCondition`, or `SetIamPolicy` bindings granting powerful/escalation roles or public `allUsers`/`allAuthenticatedUsers`).
+      3. `audit/impersonation-chain` (`high` for `GenerateAccessToken`, `GenerateIdToken`, `SignBlob`, `SignJwt` on `iamcredentials.googleapis.com` or `sts.googleapis.com` `ExchangeToken` / `serviceAccountDelegationInfo` chains from external/federated `principalSubject`, `allUsers`, or default compute/App Engine SAs). Emit `confirmed` runtime impersonation edges (`entry` / `identity` -> target `identity:<sa>`) so `findAttackPaths()` connects observed WIF/caller impersonation directly into static Terraform/IAM Secret Manager & BigQuery permissions!
+      4. `audit/sensitive-data-access` (`high` for `AccessSecretVersion`, `storage.objects.get` / `list`, or BigQuery read/export jobs invoked by `allUsers`, `allAuthenticatedUsers`, unauthenticated callers, federated `principal://` / `principalSet://` callers, or default service accounts).
+    - Redact secrets and strip invisible/BiDi/control characters from all extracted `principalEmail`, `principalSubject`, `callerIp`, `resourceName`, and `methodName` fields before storing in `Finding` or `GraphNode`/`GraphEdge`.
+  - **Do Not**: Trust unbounded strings from log payloads or mutate log files.
+
+- [x] **Task-9: Security Command Center (SCC) Findings Parser & Cross-Layer Posture Join**
+  - **Target Files**: `src/graph/scc-findings-parser.ts`, `src/graph/attack-graph.ts`, `src/report/remediation.ts`
+  - **Scope**:
+    - Parse exported SCC findings JSON (`[...]`, `{ findings: [...] }`, or `{ listFindingsResults: [...] }`) for token/camelCase-bounded `*scc*.json` files (`scc-findings.json`, `scc_export.json`, `sccFindings.json` — never matching unrelated words).
+    - Ingest active findings (`state === 'ACTIVE'` or omitted `state`; skip `INACTIVE` / `MUTED` when `mute === 'MUTED'`), mapping `CRITICAL` -> `blocker`, `HIGH` -> `high`, `MEDIUM` -> `medium`, `LOW` -> `low` (`scc/active-finding`), normalizing `resourceName` (Cloud Run services, Cloud Functions, Storage buckets, IAM Service Accounts, Projects) to join seamlessly with existing L0 `resource:` / `identity:` / `tf:` nodes (via project/location/service aliases in `correlateResources`)!
+    - Emit public-exposure entry edges (`entry:scc:public` -> resource) for public-exposure SCC categories (`PUBLIC_BUCKET_ACL`, `OPEN_FIREWALL`, `PUBLIC_SQL_INSTANCE`, `PUBLIC_CLOUD_RUN_SERVICE`, `ANONYMOUS_ACCESS`, etc.) so active SCC exposure findings automatically chain with Terraform/IAM runtime service accounts to reveal reachable Crown Jewel paths!
+  - **Do Not**: Make live GCP API calls during `audit`.
+
+- [x] **Task-10: v0.2.0 Fixtures, Documentation & `<1 MiB` Complexity / Security Test Suite**
+  - **Target Files**: `package.json`, `README.md`, `fixtures/vulnerable-enterprise/cloud-audit.ndjson`, `fixtures/vulnerable-enterprise/scc-findings.json`, `fixtures/hardened-enterprise/cloud-audit.ndjson`, `fixtures/hardened-enterprise/scc-findings.json`, `test/airlock.test.ts`, `test/cli.test.ts`, `test/graph.test.ts`, `test/phase2.test.ts`
+  - **Scope**:
+    - Bump `package.json` version to `"0.2.0"`.
+    - Add realistic vulnerable & hardened Cloud Audit Log + SCC fixtures (verifying `audit fixtures/hardened-enterprise` still exits `0` with zero `high`/`blocker` findings or attack paths, and `audit fixtures/vulnerable-enterprise` correlates SCC + Cloud Audit Logs + Terraform + IAM + WIF + Firebase Rules!).
+    - Update `README.md` (EN/JA) with `--profile`, `mcp-config`, Cloud Audit Logs threat hunting, and SCC posture correlation examples.
+    - Add exhaustive tests in `test/phase2.test.ts` (and existing test files) including `< 350 ms` / `256 MiB` heap-cap dense benchmarks for `parseAuditLogs` and `parseSccFindings`, filename word-boundary tests (`plaudit.json`, `soccer.json` ignored), untrusted log prompt-injection/secret sanitization tests, and profile enforcement tests. Mark `Task-7`..`Task-10` as `[x]` in `TASK_PLAN.md` upon passing `npm run check` and `npm test`.

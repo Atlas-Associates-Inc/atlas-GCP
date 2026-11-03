@@ -15,6 +15,11 @@ const advice: Record<string, string> = {
   'iam/privilege-escalation': 'Remove unnecessary impersonation or policy-administration grants; scope necessary grants to named service accounts.',
   'wif/unpinned-provider': 'Bind the provider to an exact trusted repository and owner using a restrictive attribute condition; validate subject and branch claims.',
   'wif/unpinned-workflow': 'Pin the workload identity provider and service account, restrict token permissions to the deployment job, and constrain repository claims on the provider.',
+  'audit/logging-tampering': 'Review the recorded logging change, restore required audit collection and sink routing through an approved change, and restrict logging administration to designated responders.',
+  'audit/iam-persistence': 'Investigate the recorded identity or IAM policy change; revoke unapproved credentials and grants through incident response, and constrain workload identity providers to trusted subjects.',
+  'audit/impersonation-chain': 'Review the observed caller and service account delegation chain, remove unnecessary impersonation grants, and scope approved delegation to named identities and resources.',
+  'audit/sensitive-data-access': 'Validate the observed data access against workload requirements, investigate unapproved access, and restrict resource permissions to the intended identities.',
+  'scc/active-finding': 'Review the active Security Command Center finding and affected resource configuration, confirm the exposure, and apply a resource-specific remediation through the approved change process.',
 };
 
 function readSource(root: string, file: string): string | undefined {

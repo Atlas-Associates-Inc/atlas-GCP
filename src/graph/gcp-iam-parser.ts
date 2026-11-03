@@ -2,13 +2,13 @@ import { dirname } from 'node:path';
 import type { GraphResult } from '../types.ts';
 import { addFinding, buildBraceMap, createLineIndex, emptyGraph, stripHclCommentsAndHeredocs } from './firebase-rules-parser.ts';
 
-const powerfulRoles = new Set(['roles/owner', 'roles/editor', 'roles/secretmanager.secretAccessor',
+export const powerfulRoles = new Set(['roles/owner', 'roles/editor', 'roles/secretmanager.secretAccessor',
   'roles/bigquery.dataEditor', 'roles/storage.admin']);
-const escalationRoles = new Set(['roles/iam.serviceAccountUser', 'roles/iam.serviceAccountTokenCreator',
+export const escalationRoles = new Set(['roles/iam.serviceAccountUser', 'roles/iam.serviceAccountTokenCreator',
   'roles/iam.securityAdmin', 'roles/iam.serviceAccountAdmin', 'iam.serviceAccounts.actAs',
   'iam.serviceAccounts.getAccessToken', 'roles/iam.workloadIdentityUser',
   'roles/iam.workloadIdentityPoolAdmin', 'iam.serviceAccounts.implicitDelegation']);
-const dataRoles: Record<string, string> = { 'roles/secretmanager.secretAccessor': 'Secret Manager secrets',
+export const dataRoles: Record<string, string> = { 'roles/secretmanager.secretAccessor': 'Secret Manager secrets',
   'roles/bigquery.dataEditor': 'BigQuery datasets', 'roles/storage.admin': 'Cloud Storage objects',
   'roles/storage.objectViewer': 'Cloud Storage objects', 'roles/datastore.user': 'Firestore data',
   'roles/owner': 'Project administration', 'roles/editor': 'Project resources' };

@@ -7,6 +7,17 @@ import { parseIamPolicy, parseTerraform, parseWifWorkflow, scanTerraformBlocks }
 import { parseAuditLogs } from './audit-log-parser.ts';
 import { parseSccFindings } from './scc-findings-parser.ts';
 
+// Skip local IDE/agent state, SDK caches, build outputs, and nested worktrees.
+export const EXCLUDED_DIRS: ReadonlySet<string> = new Set([
+  '.git', 'node_modules', '.pnpm-store', '.yarn', 'Pods',
+  '.fvm', '.dart_tool', '.symlinks', '.plugin_symlinks',
+  '.venv', 'venv', '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache',
+  '.gradle', 'build', '.build', '_build', 'dist', 'target', 'DerivedData',
+  '.next', '.nuxt', '.svelte-kit', '.astro', '.turbo', '.parcel-cache',
+  '.firebase', '.terraform', '.wrangler', '.vercel',
+  '.worktrees', '.claude', '.agents', '.codex', '.gemini', 'coverage',
+]);
+
 const rank: Record<Severity, number> = { blocker: 0, high: 1, medium: 2, low: 3, info: 4 };
 const compare = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
 const unique = (values: string[]): string[] => [...new Set(values)].sort();
@@ -86,13 +97,24 @@ export function findAttackPaths(graph: GraphResult): AttackPath[] {
       last?.findingIds.some(id => findings.get(id)?.ruleId === 'iam/privilege-escalation');
     if (last && terminal) {
       if (paths.length >= 1000) { limited = true; return; }
-      const linkedFindingIds = new Set<string>();
-      for (const edge of links) for (const id of edge.findingIds) linkedFindingIds.add(id);
-      const findingIds = [...linkedFindingIds].sort();
+      let orderedSingleEdge = links.length === 1;
+      if (orderedSingleEdge) {
+        for (let i = 1; i < links[0].findingIds.length; i++) {
+          if (!(links[0].findingIds[i - 1] < links[0].findingIds[i])) { orderedSingleEdge = false; break; }
+        }
+      }
+      let findingIds: string[];
+      if (orderedSingleEdge) findingIds = links[0].findingIds.slice();
+      else {
+        const linkedFindingIds = new Set<string>();
+        for (const edge of links) for (const id of edge.findingIds) linkedFindingIds.add(id);
+        findingIds = [...linkedFindingIds].sort();
+      }
       let severity: Severity | undefined;
       for (const id of findingIds) {
         const candidate = findings.get(id)?.severity;
         if (candidate && (severity === undefined || rank[candidate] < rank[severity])) severity = candidate;
+        if (severity === 'blocker') break;
       }
       paths.push({ id: hash(links.map(edge => edge.id)), nodes: [...ids], edges: links.map(edge => edge.id), findingIds,
         severity: severity ?? 'medium',
@@ -328,14 +350,23 @@ export function readSafeSource(directory: string, file: string, remainingBytes =
 
 export function isAuditLogFilename(name: string): boolean {
   if (!/\.(?:nd)?json$/i.test(name)) return false;
-  if (/(?:^|\.)audit\.(?:nd)?json$/i.test(name)) return true;
   const stem = name.replace(/\.(?:nd)?json$/i, '');
-  // Keep the trailing boundary case-sensitive so words such as auditorium stay unrelated.
-  return /(?:^|[-_.\s])(?:[Cc][Ll][Oo][Uu][Dd][-_.]?[Aa][Uu][Dd][Ii][Tt](?:[-_.]?[Ll][Oo][Gg][Ss]?)?|[Aa][Uu][Dd][Ii][Tt][-_.]?[Ll][Oo][Gg][Ss]?)(?=[-_.\sA-Z0-9]|$)|[a-z0-9](?:CloudAudit(?:Logs?)?|AuditLogs?)(?=[-_.\sA-Z0-9]|$)/.test(stem);
+  // Require explicit cloud/gcp audit or audit-log(s) tokens; keep trailing boundary case-sensitive.
+  return /(?:^|[-_.\s])(?:(?:[Cc][Ll][Oo][Uu][Dd]|[Gg][Cc][Pp])[-_.]?[Aa][Uu][Dd][Ii][Tt](?:[-_.]?[Ll][Oo][Gg][Ss]?)?|[Aa][Uu][Dd][Ii][Tt][-_.]?[Ll][Oo][Gg][Ss]?)(?=[-_.\sA-Z0-9]|$)|[a-z0-9](?:(?:Cloud|GCP|Gcp)Audit(?:Logs?)?|AuditLogs?)(?=[-_.\sA-Z0-9]|$)/.test(stem);
 }
 
 export function isSccFindingsFilename(name: string): boolean {
   return /\.json$/i.test(name) && /(?:^|[-_.\s])[Ss][Cc][Cc](?=[-_.\sA-Z0-9]|$)|[a-z0-9](?:Scc|SCC)(?=[-_.\sA-Z0-9]|$)/.test(name.replace(/\.json$/i, ''));
+}
+
+function isRecognizedInputFile(file: string, name: string): boolean {
+  return name === 'firebase.json'
+    || /^(?:firestore|storage)\.rules$|\.(?:firestore|storage)\.rules\.sample$/.test(name)
+    || isAuditLogFilename(name)
+    || isSccFindingsFilename(name)
+    || (/(?:^|[-_.\s])[Ii][Aa][Mm](?=[-_.\sA-Z0-9])|[a-z0-9](?:Iam|IAM)(?=[-_.\sA-Z0-9])/.test(name) && /\.json$/i.test(name))
+    || /\.tf$/i.test(name)
+    || (/\.ya?ml$/i.test(name) && (/(?:^|\/)\.github\/workflows\/[^/]+$/.test(file) || /wif/i.test(name)));
 }
 
 /** Offline scan. Symlinks are deliberately not followed, including config references. */
@@ -360,6 +391,7 @@ export function scanDirectory(directory: string): GraphResult {
     return !isAbsolute(path) && path !== '..' && !path.startsWith(`..${sep}`);
   };
   const display = (file: string): string => relative(root, file).split(sep).join('/') || '.';
+  const skipped = new Set<string>();
   let entries = 0;
   const walk = (path: string, depth: number): void => {
     if (depth > 64 || entries > 20_000) { fail(display(path), 'Directory traversal limit exceeded.', 'scan/traversal-limit'); return; }
@@ -369,20 +401,48 @@ export function scanDirectory(directory: string): GraphResult {
       }
       const names = readdirSync(path).sort(compare);
       for (const name of names) {
-        if (name === '.git' || name === 'node_modules') continue;
-        if (++entries > 20_000) { fail(display(path), 'Directory entry limit exceeded.', 'scan/traversal-limit'); break; }
         const child = join(path, name), file = display(child);
+        if (EXCLUDED_DIRS.has(name)) {
+          try { if (lstatSync(child).isFile()) continue; } catch {}
+          if (name !== '.git' && name !== 'node_modules') skipped.add(name);
+          continue;
+        }
+        if (++entries > 20_000) { fail(display(path), 'Directory entry limit exceeded.', 'scan/traversal-limit'); break; }
         try {
           const stat = lstatSync(child);
-          if (stat.isSymbolicLink()) fail(file, 'Symbolic links are not followed; linked inputs were not analyzed.', 'scan/unsafe-path');
+          if (stat.isSymbolicLink()) {
+            const unsafe = (): void => fail(file, 'Symbolic links are not followed; linked inputs were not analyzed.', 'scan/unsafe-path');
+            if (isRecognizedInputFile(file, name) || file.split('/').includes('.github')) { unsafe(); continue; }
+            try {
+              const targetReal = realpathSync(child), targetStat = lstatSync(targetReal);
+              if (!inside(targetReal)) { unsafe(); continue; }
+              const targetFile = display(targetReal);
+              const parts = relative(root, targetReal).split(sep).filter(Boolean);
+              if (parts.includes('.github')) { unsafe(); continue; }
+              if (parts.some(part => EXCLUDED_DIRS.has(part))) {
+                fail(file, 'Symbolic links to excluded directories are not followed.', 'scan/unsafe-path'); continue;
+              }
+              let component = root;
+              if (parts.some(part => { component = join(component, part); return lstatSync(component).isSymbolicLink(); })) {
+                unsafe(); continue;
+              }
+              if (targetStat.isFile()) {
+                if (isRecognizedInputFile(targetFile, basename(targetFile))) unsafe();
+                continue;
+              }
+              if (!targetStat.isDirectory()) { unsafe(); continue; }
+              diagnostics.limitations.push(`${file}: Intra-repository directory symlink was not re-traversed; canonical target ${targetFile} is scanned directly.`);
+            } catch { unsafe(); }
+          }
           else if (stat.isDirectory()) walk(child, depth + 1);
-          else if (stat.isFile()) files.push(file);
+          else if (stat.isFile()) { if (isRecognizedInputFile(file, name)) files.push(file); }
           else fail(file, 'Non-regular filesystem entries are not read.', 'scan/unsafe-path');
         } catch { fail(file, 'Could not inspect a directory entry.'); }
       }
     } catch { fail(display(path), 'Could not read a directory.'); }
   };
   walk(root, 0);
+  if (skipped.size) diagnostics.limitations.push(`Excluded generated, cache, or worktree directories were not traversed: ${[...skipped].sort(compare).join(', ')}. Audit a subdirectory directly if infrastructure configs reside there.`);
   let totalBytes = 0;
   const read = (file: string): string | undefined => {
     const result = readSafeSource(root, file, 32 * 1024 * 1024 - totalBytes);
@@ -418,7 +478,7 @@ export function scanDirectory(directory: string): GraphResult {
       : isSccFindingsFilename(name) ? (source: string) => parseSccFindings(source, file)
       : /(?:^|[-_.\s])[Ii][Aa][Mm](?=[-_.\sA-Z0-9])|[a-z0-9](?:Iam|IAM)(?=[-_.\sA-Z0-9])/.test(name) && /\.json$/i.test(name)
         ? (source: string) => parseIamPolicy(source, file)
-      : name.endsWith('.tf') ? (source: string) => {
+      : /\.tf$/i.test(name) ? (source: string) => {
         declarations.push(...resources(source, file));
         const parsed = parseTerraform(source, file);
         for (const edge of parsed.edges) if (edge.kind === 'iam-grant') {
@@ -427,7 +487,7 @@ export function scanDirectory(directory: string): GraphResult {
         }
         return parsed;
       }
-      : /\.ya?ml$/.test(name) && (/(?:^|\/)\.github\/workflows\/[^/]+$/.test(file) || /wif/i.test(name))
+      : /\.ya?ml$/i.test(name) && (/(?:^|\/)\.github\/workflows\/[^/]+$/.test(file) || /wif/i.test(name))
         ? (source: string) => parseWifWorkflow(source, file) : undefined;
     if (!parser) continue;
     const source = read(file);

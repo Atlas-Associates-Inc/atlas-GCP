@@ -1,126 +1,177 @@
-# Atlas Shield v0.2.0
+# Atlas Shield v0.2.1
 
-Offline GCP × Firebase attack-path analysis with Cloud Audit Logs threat hunting and SCC posture correlation, seven read-only MCP Airlock profiles, and optional AI evidence review. Apache-2.0; Node.js **>=22.18.0**; no runtime or development npm dependencies.
+Offline GCP × Firebase attack-path analysis, a read-only MCP Airlock, and optional AI evidence review for enterprise security teams. GCP × Firebase の攻撃経路をオフラインで解析し、読み取り専用 MCP Airlock と任意の AI 証拠レビューを提供します。
 
-GCP × Firebase の攻撃経路に Cloud Audit Logs の脅威検出と SCC の構成評価を関連付け、7 種の MCP 読み取り専用プロファイルと任意の AI 検証を提供します。Apache-2.0、Node.js **>=22.18.0**、npm 依存パッケージなし。
+[English](#english) · [日本語](#日本語)
 
-## Quickstart / はじめに
+- **Apache-2.0** — open source / オープンソース
+- **Node.js >=22.18.0** — native erasable TypeScript / ネイティブ実行可能な erasable TypeScript
+- **0 npm dependencies** — runtime and development / 実行時・開発時ともに依存パッケージなし
+- **Read-only & offline by default** — local audit / ローカル監査は既定で読み取り専用・オフライン
 
-From this checkout; no install or build step is required. この checkout ではインストール・ビルド不要です。
+```mermaid
+flowchart LR
+  inputs["L0: Static and exported telemetry inputs"] --> graph["Unified Attack Graph"]
+  graph --> reports["Table / JSON / SARIF v2.1.0 and review-only diffs (stdout)"]
+  client["L1: MCP Client"] <--> airlock["Stdio JSON-RPC 2.0 Read-Only Airlock: 7 profiles and secret/injection sanitizer"]
+  airlock <--> upstream["Caller-installed upstream MCP server"]
+  evidence["L2: Sanitized evidence (--prove)"] --> passes["Independent Prover passes: gemini or dual"]
+  passes --> gate["Non-Majority Fail-Closed Gate: BLOCKER / ERROR / PASS"]
+```
+
+## English
+
+### Why Atlas Shield
+
+Isolated scanners can identify an exposed resource without connecting it to the identity and permissions that make the exposure consequential. Atlas Shield correlates supported evidence across GCP × Firebase boundaries: public Firebase Rules, Cloud Run exposure, or Workload Identity Federation (WIF) can form entry points into paths involving runtime or federated identities, IAM privilege escalation, and access to Secret Manager, BigQuery, or Cloud Storage. The graph distinguishes observed or statically established relationships from `potential` transitions that depend on application behavior or deployment context.
+
+AI SecOps adds another boundary: an assistant may receive hostile cloud logs or invoke tools with excessive privileges. The MCP Airlock mechanically restricts forwarded requests through fail-closed tool-name policies, while secret redaction and injection sanitization prepare untrusted telemetry for review. These controls have explicit limits; they do not establish that an upstream program is trustworthy or that every model instruction attack is neutralized.
+
+### Quickstart & CLI
+
+Use this checkout with Node.js **>=22.18.0**; no install or build step is required:
 
 ```sh
 node bin/atlas-shield.mjs audit .
 node bin/atlas-shield.mjs audit /path/to/repository --format sarif
 node bin/atlas-shield.mjs audit /path/to/repository --format json --emit-patch
+node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
 ```
 
-This checkout includes intentionally vulnerable fixtures, so `audit .` exits `1`. For a clean example, use `audit fixtures/hardened-enterprise`.
-この checkout 全体の監査は脆弱fixtureにより `1` で終了します。正常例は `audit fixtures/hardened-enterprise` です。
+This checkout contains intentional vulnerable fixtures in `fixtures/vulnerable-enterprise`, so `audit .` exits `1`. The `audit fixtures/hardened-enterprise` command is the clean `0`-exit example.
 
-Package publication has **not been verified**. Once a trusted release is available on npm, the package entry point is:
-パッケージの公開状況は**未確認**です。信頼できるリリースが npm で提供された場合の実行形式:
+npm package publication has **not been verified**. Once a trusted release is available on npm, the package entry point is:
 
 ```sh
 npx @atlas-sec/shield audit .
 ```
 
-Defaults: `--format table`, `--fail-on high`, `--prover-mode gemini`. Formats: `table|json|sarif`; thresholds: `blocker|high|medium`. Reports go to stdout. `--emit-patch` includes proposed unified diffs for review; it never applies them. Audit does not modify target files or cloud resources.
+Defaults are `--format table`, `--fail-on high`, and `--prover-mode gemini`. Formats are `table|json|sarif`; failure thresholds are `blocker|high|medium`. Reports and proposed changes go to `stdout` only. `--emit-patch` includes review-only unified diffs in the selected report format; it never applies them or modifies target files or cloud resources.
 
-既定値は上記のとおりです。レポートは標準出力へ出力します。`--emit-patch` はレビュー用の修正案を含めるだけで、対象ファイルやクラウドを変更しません。
-
-| Exit | Meaning / 意味 |
+| Exit code | Meaning |
 | --- | --- |
-| `0` | Findings below the selected threshold / 指定しきい値未満 |
-| `1` | Threshold met or prover `BLOCKER` / しきい値以上、または検証が `BLOCKER` |
-| `2` | Invalid arguments, incomplete scan, prover `ERROR`, or proxy failure / 引数不正・不完全な走査・検証 `ERROR`・プロキシ障害 |
+| `0` | Findings and paths are below the selected threshold, with no incomplete scan or prover error/blocker. |
+| `1` | Findings or paths meet the selected threshold, or the prover returns `BLOCKER`. |
+| `2` | Invalid arguments, an incomplete scan, prover `ERROR`, or proxy failure. Incomplete scans and prover errors take precedence over threshold findings. |
 
-## L0: Cross-Boundary Attack Graph / 境界をまたぐ攻撃グラフ
+### L0: Deterministic Cross-Boundary Attack Graph
 
-`audit` reads Firebase rules and `firebase.json`, Terraform, exported IAM policy JSON, GitHub Actions WIF declarations, exported Cloud Audit Logs, and SCC findings. It connects supported evidence across entry points, runtime identities, IAM grants, and data access. Without `--prove`, analysis is offline and uses no model.
+`audit` reads supported local inputs into a unified directed graph. Without `--prove`, analysis is offline, makes no network calls, and uses no model.
 
-Firebase Rules・設定、Terraform、IAM ポリシー JSON、GitHub Actions の WIF 宣言、エクスポート済み Cloud Audit Logs・SCC findings を読み、入口・実行 ID・IAM 権限・データアクセスを関連付けます。`--prove` がなければ、通信やモデルを使用しません。
+Supported inputs are Firebase `firestore.rules` / `storage.rules` and `*.firestore.rules.sample` / `*.storage.rules.sample` files, Rules paths declared in `firebase.json`, Terraform `*.tf`, exported IAM policy JSON `*iam*.json` with IAM token/camelCase boundaries, GitHub Actions WIF workflows (`.github/workflows/*.yml` / `*.yaml` and WIF-named YAML files), exported Cloud Audit Logs, and exported SCC findings. Terraform and workflow extensions are case-insensitive.
 
-Cloud Audit Logs accept JSON arrays, `{ "entries": [...] }`, a single `protoPayload` object, or NDJSON. Discovery recognizes `*.audit.json`, `*.audit.ndjson`, and token/camelCase forms such as `cloudaudit.json`, `cloud-audit.ndjson`, `audit-logs.json`, and `projectAuditLogs.json`. The four rule families cover logging tampering, identity persistence, impersonation, and sensitive data access. Explicitly denied calls do not establish compromise. Successful credential events can join static IAM grants through `identity:<service-account>` nodes.
+**Rule reference**
 
-Cloud Audit Logs は配列・`entries`・単一の `protoPayload` 付きオブジェクト・NDJSON に対応します。上記のファイル名を単語境界で識別し、ログ設定改変・永続的な認証権限・なりすまし・機密データアクセスを検出します。明示的に拒否された呼び出しを侵害として扱いません。成功した認証情報の発行は、同じサービスアカウントの静的 IAM 権限へ結合します。
+| Rule ID | Severity | Detection / interpretation |
+| --- | --- | --- |
+| `firebase/public-read` | `high` | Unconditional public Rules reads. |
+| `firebase/public-write` | `high` | Unconditional public Rules writes. |
+| `firebase/recursive-wildcard` | `high` | Public reads through a recursive wildcard expose descendants. |
+| `firebase/privilege-fields` | `medium` | Authenticated user-document writes lack a recognized field allowlist; application trust and validation need review. |
+| `gcp/public-service` | `high` | Public IAM grants to `allUsers` or `allAuthenticatedUsers`. |
+| `gcp/public-ingress` | `medium` | External service ingress is enabled; this alone does not prove unauthenticated access. |
+| `iam/default-service-account` | `high` | A default service account holds a recognized powerful role. |
+| `iam/privilege-escalation` | `high` | Recognized service-account or IAM escalation capabilities; scope, conditions, and prerequisites need review. |
+| `wif/unpinned-provider` | `high` | A GitHub WIF provider lacks a recognized mandatory literal repository restriction. Workflow authentication declarations also add `potential` edges, without proving provider trust. |
+| `audit/logging-tampering` | `blocker` / `high` | Logging sink deletion/disablement or audit configuration removal; suspicious exclusion changes. |
+| `audit/iam-persistence` | `high` | Service-account key creation, insufficiently constrained WIF provider changes, or powerful/public IAM grants. |
+| `audit/impersonation-chain` | `high` | Supported credential issuance, token exchange, or delegation chains involving suspicious callers. |
+| `audit/sensitive-data-access` | `high` | Supported secret, storage, or BigQuery access by public, federated, unauthenticated, or default-account callers. |
+| `scc/active-finding` | `blocker` / `high` / `medium` / `low` | Active SCC findings map from `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` respectively. |
+| `scan/*` | `high` | Unsafe, unreadable, malformed, unsupported, or bounded inputs/path enumeration make the scan incomplete: exit `2` and no `--prove` invocation. |
 
-SCC accepts arrays, `{ "findings": [...] }`, `{ "listFindingsResults": [...] }`, and `{ finding, resource }` items from `gcloud` exports. `*scc*.json` discovery requires a token/camelCase boundary, as in `scc-findings.json` or `projectSccReport.json`; unrelated names such as `soccer.json` are ignored. `INACTIVE` and `MUTED` records are excluded. Active public exposure joins uniquely matched Terraform Cloud Run/Functions runtime identities and normalized storage, secret, and dataset nodes. Runtime identity transitions remain `potential` because application behavior is required; exported observations do not verify current cloud state.
+**Workspace traversal and symlinks**
 
-SCC は配列・`findings`・`listFindingsResults` と `gcloud` の `{ finding, resource }` 形式に対応します。`scc` の単語・camelCase 境界でファイルを識別し、`INACTIVE`・`MUTED` を除外します。有効な公開露出を Terraform の Cloud Run／Functions の実行 ID やストレージ・機密情報・データセットへ関連付けます。アプリケーション経由の実行 ID への遷移は `potential` のままです。エクスポート内容は現在のクラウド状態を保証しません。
+Standard generated, SDK, cache, local agent/IDE state, and worktree child directories in `EXCLUDED_DIRS` are skipped. Skipped names are recorded deterministically in `limitations`, except `.git` and `node_modules`. Audit a subdirectory directly to include infrastructure configs beneath an otherwise excluded child. A regular file named `build` is not reported as an excluded directory.
 
-Both telemetry parsers redact recognized secrets, remove controls from stored text, cap labels/evidence at 512 characters, and reject malformed exports or key fields longer than 2048 characters. Each file permits at most 10,000 records; audit bindings/members share a 10,000-expansion budget. Incomplete scans exit `2` and suppress `--prove`. Telemetry remediation is review-only advice with no generated patch.
+Explicit `firebase.json` Rules paths such as `build/custom.rules` are still analyzed when they contain no symlinks, root escapes, `.git`, or `node_modules` components. Ordinary intra-repository non-input file links are ignored. Intra-repository directory links are not re-traversed when their canonical targets are reachable for direct scanning; a limitation is recorded.
 
-両パーサーは認識した秘密情報を除去し、制御文字を処理して表示・証跡を 512 文字以内にします。形式不正・2048 文字を超える主要項目・1 ファイル 10,000 件超を拒否します。監査ログの binding/member 展開も合計 10,000 件以内です。不完全な走査は終了コード `2` となり、`--prove` を呼びません。テレメトリーの修正案はレビュー用の助言のみです。
+Symlinked security inputs or aliases to them, broken or out-of-root links, links into excluded targets, symlinked canonical-target ancestors, and non-regular entries encountered during traversal fail closed with exit `2`. A symlink with `.github` in any source or canonical-target path segment also fails closed; regular workflow files remain supported.
 
-Deterministic, bounded static analysis does not prove deployed policy or runtime exploitability. Rules expressions, Terraform variables/modules/dynamic expressions, custom roles, and workflow expressions are not fully evaluated. Review `limitations` and potential paths against deployment context; exit `0` is not a security guarantee. Keep input files stable while scanning.
+**Exported telemetry and correlation**
 
-決定論的な静的解析ですが、上記の構文や動的設定は完全には評価しません。`limitations` と候補経路を実環境に照らして確認してください。終了コード `0` は安全性の保証ではありません。走査中は入力を変更しないでください。
+Cloud Audit Logs accept JSON arrays, `{ "entries": [...] }`, a single object containing `protoPayload`, or NDJSON. Discovery requires explicit `cloud-audit` / `cloudaudit` / `gcp-audit` / `audit-log(s)` token or camelCase boundaries in `.json` / `.ndjson` filenames. Examples: `cloud-audit.json`, `cloud-audit.ndjson`, `cloudaudit.json`, `gcp-audit.json`, `audit-log.json`, `audit_logs.ndjson`, and `projectAuditLogs.json`. Generic `audit.json`, `npm-audit.json`, `*.audit.json`, and `*.audit.ndjson` tool reports are ignored. Explicitly denied calls are ignored as compromise evidence. Successful credential events can join static IAM grants through shared `identity:<service-account>` nodes.
 
-## L1: Zero-Trust MCP Airlock / MCP 読み取り専用ポリシー
+SCC accepts arrays, `{ "findings": [...] }`, `{ "listFindingsResults": [...] }`, and `{ finding, resource }` items from `gcloud` exports. Discovery of `*scc*.json` requires a token/camelCase boundary, as in `scc-findings.json` or `projectSccReport.json`; unrelated names such as `soccer.json` are ignored. `INACTIVE` findings and records marked `MUTED` are excluded. Active public exposure joins uniquely matched Terraform Cloud Run/Functions runtime identities and normalized storage, secret, and dataset nodes. Application-mediated runtime identity hops remain `potential`; exported observations do not verify current cloud state.
 
-The Airlock proxies newline-delimited JSON-RPC 2.0 over **stdio**, filters tool names through a fail-closed read-verb policy and an optional server profile, redacts recognized secrets, and sanitizes untrusted response text. A profile never relaxes the global mutation block. Configure your MCP client to launch:
+Both telemetry parsers redact recognized secrets and remove controls from stored text. Malformed exports or oversized key fields fail closed. Telemetry remediation is review-only advice, with no generated patch.
 
-Airlock は **stdio** の改行区切り JSON-RPC 2.0 を仲介し、読み取り動詞と任意のサーバープロファイルでツール名を制限します。プロファイル指定でも更新操作の禁止は維持されます。認識した秘密情報や不審な応答テキストを処理し、MCP クライアントから以下の形式で起動します。
+| Bound | Maximum |
+| --- | --- |
+| Workspace traversal | Depth `<= 64`; `<= 20,000` entries. |
+| Input bytes | `<= 1 MiB` per file; `<= 32 MiB` per scan. |
+| Firebase Rules scope expansion | Match depth `<= 64`; joined path `<= 4096` characters. |
+| Telemetry records | `<= 10,000` records per file. |
+| Audit-log grant expansion | `<= 10,000` combined binding/member expansions per file. |
+| Stored telemetry text / key fields | Labels and evidence `<= 512` characters; key fields `<= 2048` characters. |
+| Attack-path enumeration | `<= 1,000` paths, `<= 64` nodes per path, `<= 20,000` traversals. |
+
+**Analysis limits:** Rules expressions, Terraform variables/modules/dynamic expressions, custom roles, and workflow expressions are not fully evaluated. Static analysis does not prove live policy or runtime exploitability. Review `limitations` and `potential` paths against deployment context; **exit `0` is not a security guarantee**. Keep input files stable while scanning.
+
+### L1: Zero-Trust Read-Only MCP Airlock
+
+The Airlock proxies newline-delimited **stdio JSON-RPC 2.0**, filters tool names through a fail-closed read-verb policy and an optional server profile, redacts recognized secrets, and sanitizes untrusted responses. Both the global policy and selected profile must permit a tool; a profile never relaxes the global mutation block.
+
+Configure your MCP client to launch the Airlock with a trusted upstream program. `sanitize` reads telemetry from standard input:
 
 ```sh
 node bin/atlas-shield.mjs airlock --profile scc --upstream-cmd /path/to/trusted-mcp-server
-# Repeat --upstream-arg for each argument; use --upstream-arg=--flag for flags.
 node bin/atlas-shield.mjs sanitize < telemetry.txt
 node bin/atlas-shield.mjs mcp-config --profile scc --profile firebase --client gemini
 node bin/atlas-shield.mjs mcp-config --client agy
 ```
 
-Installed CLI forms: `atlas-shield airlock --profile <scc|secops|firebase|cloudrun|developer-knowledge|prowler|semgrep> --upstream-cmd ...` and `atlas-shield mcp-config [--profile <name>...] [--client agy|gemini]`.
+Repeat `--upstream-arg` for each argument; use `--upstream-arg=<value>` for flags, for example `--upstream-arg=--flag`. Installed CLI forms are `atlas-shield airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]` and `atlas-shield mcp-config [--profile <name>...] [--client agy|gemini]`.
 
-`mcp-config` prints JSON templates wrapping caller-installed MCP binaries, with all seven profiles by default. It does not execute or verify upstream installations, write configuration files, or change home directories. Both supported clients receive the `mcpServers` format. The `npx` templates use `--no-install` and preserve flags as `--upstream-arg=<value>`.
+`mcp-config` defaults to `gemini` and all seven profiles. Both clients receive `mcpServers` JSON on `stdout` only. This generator never runs or verifies upstream binaries, writes configuration files, or touches home directories. Generated wrappers expect `atlas-shield` on the client’s executable path. The `npx` templates use `--no-install` and preserve upstream flags as `--upstream-arg=<value>`.
 
-`mcp-config` は利用者が導入した MCP バイナリーを包む JSON テンプレートを標準出力へ出します。既定は全 7 プロファイル、クライアントは `gemini` です。上流の実行・インストール確認・設定ファイルやホームの変更は行いません。`agy` と `gemini` は同じ `mcpServers` 形式を使用し、`npx` テンプレートは `--no-install`、引数は `--upstream-arg=<value>` 形式です。
+**Airlock profiles** — commands are templates from `src/airlock/profiles.ts` for caller-installed upstreams, not verified live integrations.
 
-Upstream references / 上流サーバーの参照先:
+| Profile ID | Read scope | Upstream template command | Upstream reference |
+| --- | --- | --- | --- |
+| `scc` | Security Command Center findings and posture | `uvx mcp-security-scc` | [google/mcp-security](https://github.com/google/mcp-security) |
+| `secops` | Security Operations telemetry and detections | `uvx google-secops-mcp` | [google/mcp-security](https://github.com/google/mcp-security) |
+| `firebase` | Firebase projects, applications, and data | `npx --no-install firebase-tools experimental:mcp` | [Firebase MCP documentation](https://firebase.google.com/docs/ai-assistance/mcp-server) |
+| `cloudrun` | Cloud Run services, revisions, jobs, and logs | `npx --no-install @google-cloud/cloud-run-mcp` | Caller-installed `@google-cloud/cloud-run-mcp` package |
+| `developer-knowledge` | Developer documentation and references | `uvx google-developer-knowledge-mcp` | [Google Developer Knowledge MCP](https://developers.google.com/knowledge/mcp) |
+| `prowler` | Prowler findings, checks, and compliance | `uvx prowler-mcp` | [Prowler MCP announcement](https://prowler.com/blog/prowler-launches-lighthouse-ai-and-mcp-server-bringing-autonomous-security-to-devsecops-teams) |
+| `semgrep` | Semgrep rules, findings, and configuration | `uvx semgrep-mcp` | [Semgrep MCP repository](https://github.com/semgrep/mcp) |
 
-| Server | Primary source / 一次資料 |
-| --- | --- |
-| `scc-mcp`, `google-secops-mcp` | [google/mcp-security](https://github.com/google/mcp-security) |
-| `google-developer-knowledge` | [Official Google developer documentation MCP / Google 公式開発資料 MCP](https://developers.google.com/knowledge/mcp) |
-| `prowler-mcp` | [Prowler MCP announcement](https://prowler.com/blog/prowler-launches-lighthouse-ai-and-mcp-server-bringing-autonomous-security-to-devsecops-teams) |
-| `semgrep-mcp` | [Semgrep MCP repository](https://github.com/semgrep/mcp) |
-| `firebase-mcp-server` | [Firebase MCP documentation](https://firebase.google.com/docs/ai-assistance/mcp-server) |
+**Security boundaries:** Atlas Shield has no HTTP MCP transport. HTTP-only services such as Google Developer Knowledge require a separately trusted stdio bridge; the template is not evidence of a working bridge. Live integrations are unverified. The caller must independently restrict and verify upstream binaries, arguments, and credentials. **Lexical tool-name filtering does not prove semantic read-only behavior**; profiles do not authenticate server identity. Sanitization is not a complete prompt-injection defense.
 
-Live integrations are unverified. HTTP-only services such as Google Developer Knowledge require a separately trusted stdio bridge; Atlas Shield has no HTTP MCP transport. Independently restrict and verify upstream binaries, arguments, and credentials. **Lexical tool-name filtering does not prove semantic read-only behavior**; sanitization is not a complete prompt-injection defense.
-
-実接続は未検証です。HTTP サービスには信頼できる stdio ブリッジが別途必要です。上流プログラム・引数・認証情報は個別に信頼性と権限を確認してください。**ツール名だけでは読み取り専用を証明できず**、サニタイズも完全な防御ではありません。
-
-## L2: Sovereign Prover / 任意の AI 検証
+### L2: Optional Sovereign AI Prover
 
 ```sh
 node bin/atlas-shield.mjs audit . --prove --prover-mode gemini
 node bin/atlas-shield.mjs audit . --prove --prover-mode dual
 ```
 
-**Pure Gemini Sovereign Mode** (`gemini`) runs standalone with two independent passes, `argonArchitect` and `geminiRedTeam`, using Gemini/Vertex AI (or the configured `agy` adapter). `dual` uses `argonHigh` plus `astraUltra`; the latter invokes an authenticated `codex` CLI with `gpt-6-astra`, ultra reasoning, a read-only sandbox, and an ephemeral session. Google lanes use `gemini-4-argon-high`.
+**Pure Gemini Sovereign Mode** (`gemini`, the default) runs independent `argonArchitect` and `geminiRedTeam` passes on `gemini-4-argon-high` through Gemini, Vertex AI, or the configured `agy` adapter. It requires no non-Google prover backend.
 
-`gemini` は Gemini / Vertex AI 単独で Architect と Red Team の 2 系統を実行します。`dual` は Argon High と Astra Ultra を使用します。各系統にはサニタイズ済みの同じ根拠を渡し、他方の回答は共有しません。
+`dual` runs `argonHigh` on `gemini-4-argon-high` plus `astraUltra` through an installed, authenticated `codex` CLI with `gpt-6-astra`, ultra reasoning, a read-only sandbox, and an ephemeral session. The adapter forwards `CODEX_HOME` and `OPENAI_API_KEY` when set. Both modes pass identical sanitized evidence to their lanes without sharing responses across lanes.
 
-| Configuration | Required setup / 必要な設定 |
+| Configuration | Required setup |
 | --- | --- |
-| `ATLAS_GEMINI_BACKEND=gemini` (default / 既定) | `GEMINI_API_KEY` |
+| `ATLAS_GEMINI_BACKEND=gemini` (default) | `GEMINI_API_KEY` |
 | `ATLAS_GEMINI_BACKEND=vertex` | `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_OAUTH_ACCESS_TOKEN` |
-| `ATLAS_GEMINI_BACKEND=agy` | Installed, authenticated `agy` CLI supporting plan mode and sandbox / 対応 CLI の導入・認証 |
-| `--prover-mode dual` | Google backend above plus installed, authenticated `codex`; its adapter forwards `CODEX_HOME` and `OPENAI_API_KEY` when set / Google 側設定と認証済み `codex` |
+| `ATLAS_GEMINI_BACKEND=agy` | Installed, authenticated `agy` CLI supporting plan mode and sandbox. |
+| `--prover-mode dual` | One Google backend above plus an installed, authenticated `codex` CLI; `CODEX_HOME` and `OPENAI_API_KEY` are forwarded when set. |
 
-Any schema-valid exploit proof yields `BLOCKER`; otherwise an empty, malformed, failed, or timed-out lane yields `ERROR`. Proofs are model-generated claims with steps and evidence, not automatically executed exploits. `PASS` only means neither pass established an exploit from the supplied evidence. An incomplete local scan exits `2` without invoking the prover.
+The **Non-Majority Fail-Closed Gate** does not vote away a lane’s exploit claim:
 
-有効な形式の攻撃手順・根拠があれば `BLOCKER`、それがなく出力不正・失敗・タイムアウトがあれば `ERROR` です。攻撃手順はモデルの提示であり、自動再現はしません。ローカル走査が不完全なら、モデルを呼ばず終了コード `2` を返します。
+| Verdict | Meaning |
+| --- | --- |
+| `BLOCKER` | Any lane returns a schema-valid exploit proof with steps and evidence, even if another lane passes or fails. |
+| `ERROR` | No valid exploit proof, but a lane returns empty/malformed output, fails, or times out. |
+| `PASS` | Both lanes return valid passes; neither establishes an exploit from the supplied evidence. |
 
-`--prove` sends sanitized evidence to the selected provider/CLI. Credentials, data perimeter, retention, model access, and CLI sandbox enforcement require environment configuration. Zero retention is not guaranteed; live providers and model availability are unverified.
+Proofs are **model-generated claims, not automatically executed exploits**. `PASS` is not a security guarantee. An incomplete local scan exits `2` without invoking the prover.
 
-根拠は選択したプロバイダーまたは CLI に送信されます。認証・データ境界・保持期間・モデル利用権限・sandbox は環境側で設定してください。保持ゼロは保証せず、実接続とモデル提供状況は未検証です。
+`--prove` transmits sanitized evidence to the selected provider/CLI. Credentials, data perimeter, retention, model access, and CLI sandbox enforcement require environment configuration. Mode names do not guarantee a closed perimeter or zero retention. Live provider integrations and model availability are **unverified**.
 
-## GitHub Actions
+### GitHub Actions & Verification
 
-The composite action requires Node.js >=22.18.0. This example runs from an Atlas Shield checkout using `uses: ./`; point `directory` at the checked-out target. It runs offline and preserves CLI exit codes. Inputs: `directory` (default `.`), `format` (`table`), `fail-on` (`high`).
-
-以下は Atlas Shield の checkout 内で使う例です。対象 checkout のパスを `directory` に指定します。オフラインで実行し、CLI の終了コードを維持します。
+The composite action requires Node.js **>=22.18.0**. This example runs from an Atlas Shield checkout using `uses: ./`; point `directory` at the checked-out target. It runs offline and preserves CLI exit codes. Inputs are `directory` (default `.`), `format` (default `table`), and `fail-on` (default `high`). Scanning this entire checkout includes the intentional vulnerable fixtures and therefore exits `1`.
 
 ```yaml
 permissions:
@@ -142,12 +193,198 @@ jobs:
           fail-on: high
 ```
 
-Action pins: [checkout v4.2.2](https://github.com/actions/checkout/releases/tag/v4.2.2), [setup-node v4.4.0](https://github.com/actions/setup-node/releases/tag/v4.4.0). For local development / ローカル検証:
+Action pins: [checkout v4.2.2](https://github.com/actions/checkout/releases/tag/v4.2.2), [setup-node v4.4.0](https://github.com/actions/setup-node/releases/tag/v4.4.0).
+
+Run local verification in order:
 
 ```sh
 npm run check
 npm test
 ```
 
-Test files run sequentially so the fixed wall-clock parser budgets do not compete with other test workers. Existing assertions and heap limits remain enabled.
-固定の処理時間を測る性能テスト同士の競合を避けるため、テストファイルは直列実行します。検証条件とヒープ上限は維持しています。
+Test files run sequentially so deterministic wall-clock parser budgets do not compete with other test workers. Assertions and heap limits remain enabled.
+
+## 日本語
+
+### なぜ Atlas Shield か
+
+個別のスキャナーでは、公開されたリソースを検出できても、その影響を決める ID と権限のつながりを見落とす場合があります。Atlas Shield は、GCP × Firebase の境界をまたぐ対応済みの証拠を関連付けます。公開された Firebase Rules、Cloud Run、Workload Identity Federation（WIF）を入口として、実行 ID またはフェデレーション ID、IAM 権限昇格、Secret Manager・BigQuery・Cloud Storage へのアクセスに至る経路を扱います。グラフでは、観測済みまたは静的に確認できた関係と、アプリケーションの動作やデプロイ環境に依存する `potential` な遷移を区別します。
+
+AI SecOps には別の境界もあります。アシスタントは攻撃用の指示を含むクラウドログを受け取ったり、過剰な権限を持つツールを呼び出したりする可能性があります。MCP Airlock は、安全側に拒否するツール名ポリシーで転送要求を機械的に制限し、秘密情報の除去とインジェクションのサニタイズによって、信頼できないテレメトリーをレビュー可能な形にします。これらの制御には限界があり、上流プログラムの信頼性や、モデルへのあらゆる指示攻撃の無効化を証明するものではありません。
+
+### クイックスタート・CLI
+
+Node.js **>=22.18.0** で、この checkout から実行できます。インストール・ビルドは不要です。
+
+```sh
+node bin/atlas-shield.mjs audit .
+node bin/atlas-shield.mjs audit /path/to/repository --format sarif
+node bin/atlas-shield.mjs audit /path/to/repository --format json --emit-patch
+node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
+```
+
+この checkout には `fixtures/vulnerable-enterprise` に意図的な脆弱性を持つ fixture があるため、`audit .` は終了コード `1` を返します。`audit fixtures/hardened-enterprise` が終了コード `0` の正常例です。
+
+npm パッケージの公開状況は**未確認**です。信頼できるリリースが npm で提供された場合の実行形式は次のとおりです。
+
+```sh
+npx @atlas-sec/shield audit .
+```
+
+既定値は `--format table`、`--fail-on high`、`--prover-mode gemini` です。出力形式は `table|json|sarif`、失敗とする重大度のしきい値は `blocker|high|medium` から選択します。レポートと変更案は `stdout`（標準出力）のみに出力します。`--emit-patch` は選択した形式のレポートにレビュー専用の unified diff を含めますが、適用は行わず、対象ファイルやクラウドリソースを変更しません。
+
+| 終了コード | 意味 |
+| --- | --- |
+| `0` | 指摘と経路が指定しきい値未満で、不完全な走査や Prover のエラー・ブロッカーがない。 |
+| `1` | 指定しきい値以上の指摘または経路がある、または Prover が `BLOCKER` を返した。 |
+| `2` | 引数不正、不完全な走査、Prover の `ERROR`、またはプロキシ障害。不完全な走査と Prover のエラーは、しきい値以上の指摘より優先される。 |
+
+### L0: 決定論的クロス境界攻撃グラフ
+
+`audit` は対応するローカル入力を読み込み、統合された有向グラフを構築します。`--prove` を指定しなければオフラインで解析し、ネットワーク通信もモデルも使用しません。
+
+対応入力は、Firebase の `firestore.rules` / `storage.rules` と `*.firestore.rules.sample` / `*.storage.rules.sample`、`firebase.json` に宣言された Rules パス、Terraform の `*.tf`、IAM の単語・camelCase 境界を持つエクスポート済み IAM ポリシー JSON `*iam*.json`、GitHub Actions の WIF ワークフロー（`.github/workflows/*.yml` / `*.yaml` およびファイル名に WIF を含む YAML）、エクスポート済み Cloud Audit Logs、SCC findings です。Terraform とワークフローの拡張子は大文字・小文字を区別しません。
+
+**検出ルール一覧**
+
+| ルール ID | 重大度 | 検出内容・解釈 |
+| --- | --- | --- |
+| `firebase/public-read` | `high` | Rules による無条件の公開読み取り。 |
+| `firebase/public-write` | `high` | Rules による無条件の公開書き込み。 |
+| `firebase/recursive-wildcard` | `high` | 再帰ワイルドカードを通じた公開読み取りによる子孫データの露出。 |
+| `firebase/privilege-fields` | `medium` | 認証済みユーザーによるユーザードキュメントへの書き込みに、認識可能なフィールド許可リストがない。アプリケーションの信頼境界と検証処理の確認が必要。 |
+| `gcp/public-service` | `high` | `allUsers` または `allAuthenticatedUsers` への公開 IAM 権限付与。 |
+| `gcp/public-ingress` | `medium` | サービスの外部 ingress が有効。これだけでは未認証アクセスを証明しない。 |
+| `iam/default-service-account` | `high` | 既定のサービスアカウントが、検出対象の強力なロールを保有。 |
+| `iam/privilege-escalation` | `high` | 検出対象のサービスアカウント・IAM 権限昇格能力。適用範囲、条件、前提権限の確認が必要。 |
+| `wif/unpinned-provider` | `high` | GitHub WIF プロバイダーに、認識可能な必須のリテラルリポジトリ制約がない。ワークフローの認証宣言も `potential` な辺を追加するが、プロバイダーの信頼設定を証明しない。 |
+| `audit/logging-tampering` | `blocker` / `high` | ログシンクの削除・無効化、監査設定の除去、または疑わしい除外設定の変更。 |
+| `audit/iam-persistence` | `high` | サービスアカウント鍵の作成、制約が不十分な WIF プロバイダー変更、または強力な権限・公開 IAM 権限の付与。 |
+| `audit/impersonation-chain` | `high` | 疑わしい呼び出し元が関与する、対応済みの認証情報発行・トークン交換・委任チェーン。 |
+| `audit/sensitive-data-access` | `high` | 公開・フェデレーション・未認証・既定アカウントによる、対応済みの機密情報・ストレージ・BigQuery アクセス。 |
+| `scc/active-finding` | `blocker` / `high` / `medium` / `low` | 有効な SCC findings の `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` をそれぞれ対応付ける。 |
+| `scan/*` | `high` | 危険・読み取り不能・形式不正・非対応の入力、または入力や経路列挙の上限到達により走査が不完全となる。終了コード `2` を返し、`--prove` は呼び出さない。 |
+
+**ワークスペース走査とシンボリックリンク**
+
+`EXCLUDED_DIRS` に含まれる、標準の生成物・SDK・キャッシュ・ローカルエージェント／IDE 状態・worktree の子ディレクトリは除外します。除外名は決定論的に `limitations` へ記録しますが、`.git` と `node_modules` は記録対象外です。除外される子ディレクトリ内のインフラ設定を含めるには、そのサブディレクトリを直接監査してください。`build` という名前の通常ファイルは、除外ディレクトリとして報告しません。
+
+`firebase.json` が明示した `build/custom.rules` などの Rules パスは、シンボリックリンク、ルート外への逸脱、`.git`、`node_modules` のパス要素を含まなければ解析します。リポジトリ内の入力対象ではない通常ファイルへのリンクは無視します。リポジトリ内のディレクトリリンクは、正規の参照先を直接走査できる場合には再走査せず、その制約を記録します。
+
+セキュリティ入力やその別名へのリンク、壊れたリンク、ルート外へのリンク、除外先へのリンク、正規の参照先の祖先にシンボリックリンクを含むもの、走査中に検出した通常ファイル・ディレクトリ以外のエントリーは、安全側に拒否して終了コード `2` を返します。リンク元または正規の参照先のパス要素に `.github` があるシンボリックリンクも拒否します。通常のワークフローファイルは引き続き解析対象です。
+
+**エクスポート済みテレメトリーと関連付け**
+
+Cloud Audit Logs は JSON 配列、`{ "entries": [...] }`、`protoPayload` を含む単一オブジェクト、NDJSON に対応します。発見対象は、`.json` / `.ndjson` のファイル名に明示的な `cloud-audit` / `cloudaudit` / `gcp-audit` / `audit-log(s)` の単語境界または camelCase 境界があるものです。例は `cloud-audit.json`、`cloud-audit.ndjson`、`cloudaudit.json`、`gcp-audit.json`、`audit-log.json`、`audit_logs.ndjson`、`projectAuditLogs.json` です。一般的なツールの `audit.json`、`npm-audit.json`、`*.audit.json`、`*.audit.ndjson` レポートは無視します。明示的に拒否された呼び出しは侵害の根拠として扱いません。成功した認証情報イベントは、共通の `identity:<service-account>` ノードを通じて静的 IAM 権限と結合できます。
+
+SCC は配列、`{ "findings": [...] }`、`{ "listFindingsResults": [...] }`、`gcloud` エクスポートの `{ finding, resource }` 項目に対応します。`*scc*.json` の発見には単語・camelCase 境界が必要です。`scc-findings.json` や `projectSccReport.json` が該当し、`soccer.json` のような無関係な名前は無視します。`INACTIVE` の findings と `MUTED` のレコードは除外します。有効な公開露出を、一意に対応する Terraform の Cloud Run／Functions の実行 ID と、正規化したストレージ・機密情報・データセットのノードへ関連付けます。アプリケーションを介した実行 ID への遷移は `potential` のままです。エクスポート済みの観測結果は、現在のクラウド状態を検証するものではありません。
+
+両テレメトリーパーサーは、認識した秘密情報を除去し、保存するテキストから制御文字を取り除きます。形式不正のエクスポートや上限を超えた主要フィールドは安全側に拒否します。テレメトリーの修正案はレビュー用の助言のみで、パッチは生成しません。
+
+| 制限対象 | 上限 |
+| --- | --- |
+| ワークスペース走査 | 深さ `<= 64`、エントリー数 `<= 20,000`。 |
+| 入力バイト数 | 1 ファイル `<= 1 MiB`、1 回の走査 `<= 32 MiB`。 |
+| Firebase Rules のスコープ展開 | match の深さ `<= 64`、結合パス長 `<= 4096` 文字。 |
+| テレメトリーレコード | 1 ファイル `<= 10,000` 件。 |
+| 監査ログの権限展開 | 1 ファイルの binding/member 展開の合計 `<= 10,000` 件。 |
+| 保存するテレメトリーテキスト・主要フィールド | ラベルと証拠は `<= 512` 文字、主要フィールドは `<= 2048` 文字。 |
+| 攻撃経路の列挙 | 経路数 `<= 1,000`、1 経路のノード数 `<= 64`、遷移の探索回数 `<= 20,000`。 |
+
+**解析の限界:** Rules 式、Terraform の変数・モジュール・動的な式、カスタムロール、ワークフロー式は完全には評価しません。静的解析は、実環境のポリシーや実行時の攻撃成立を証明しません。`limitations` と `potential` な経路をデプロイ環境に照らして確認してください。**終了コード `0` は安全性の保証ではありません**。走査中は入力ファイルを変更しないでください。
+
+### L1: ゼロトラスト読み取り専用 MCP Airlock
+
+Airlock は改行区切りの **stdio JSON-RPC 2.0** を仲介し、安全側に拒否する読み取り動詞ポリシーと任意のサーバープロファイルでツール名を制限します。認識した秘密情報を除去し、信頼できない応答をサニタイズします。ツールは共通ポリシーと選択したプロファイルの両方で許可される必要があり、プロファイルが共通の変更操作禁止を緩和することはありません。
+
+信頼できる上流プログラムを指定して Airlock を起動するよう、MCP クライアントを設定します。`sanitize` は標準入力からテレメトリーを読み込みます。
+
+```sh
+node bin/atlas-shield.mjs airlock --profile scc --upstream-cmd /path/to/trusted-mcp-server
+node bin/atlas-shield.mjs sanitize < telemetry.txt
+node bin/atlas-shield.mjs mcp-config --profile scc --profile firebase --client gemini
+node bin/atlas-shield.mjs mcp-config --client agy
+```
+
+引数ごとに `--upstream-arg` を繰り返します。フラグには `--upstream-arg=<value>` 形式を使い、例えば `--upstream-arg=--flag` と記述します。インストール済み CLI の形式は `atlas-shield airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]` と `atlas-shield mcp-config [--profile <name>...] [--client agy|gemini]` です。
+
+`mcp-config` の既定クライアントは `gemini`、既定の対象は全 7 プロファイルです。どちらのクライアントにも `mcpServers` JSON を `stdout` のみに出力します。この生成処理は上流バイナリーの実行・検証、設定ファイルへの書き込み、ホームディレクトリへの変更を行いません。生成したラッパーは、クライアントの実行可能ファイル検索パスに `atlas-shield` があることを前提とします。`npx` テンプレートは `--no-install` を使い、上流のフラグを `--upstream-arg=<value>` として保持します。
+
+**Airlock プロファイル** — コマンドは `src/airlock/profiles.ts` にある利用者導入済み上流用のテンプレートであり、実接続を検証済みという意味ではありません。
+
+| プロファイル ID | 読み取り範囲 | 上流コマンドのテンプレート | 上流の参照先 |
+| --- | --- | --- | --- |
+| `scc` | Security Command Center の findings・セキュリティ状態 | `uvx mcp-security-scc` | [google/mcp-security](https://github.com/google/mcp-security) |
+| `secops` | Security Operations のテレメトリー・検出結果 | `uvx google-secops-mcp` | [google/mcp-security](https://github.com/google/mcp-security) |
+| `firebase` | Firebase のプロジェクト・アプリケーション・データ | `npx --no-install firebase-tools experimental:mcp` | [Firebase MCP ドキュメント](https://firebase.google.com/docs/ai-assistance/mcp-server) |
+| `cloudrun` | Cloud Run のサービス・リビジョン・ジョブ・ログ | `npx --no-install @google-cloud/cloud-run-mcp` | 利用者が導入する `@google-cloud/cloud-run-mcp` パッケージ |
+| `developer-knowledge` | 開発者向けドキュメント・リファレンス | `uvx google-developer-knowledge-mcp` | [Google Developer Knowledge MCP](https://developers.google.com/knowledge/mcp) |
+| `prowler` | Prowler の findings・チェック・コンプライアンス | `uvx prowler-mcp` | [Prowler MCP 発表](https://prowler.com/blog/prowler-launches-lighthouse-ai-and-mcp-server-bringing-autonomous-security-to-devsecops-teams) |
+| `semgrep` | Semgrep のルール・findings・設定 | `uvx semgrep-mcp` | [Semgrep MCP リポジトリ](https://github.com/semgrep/mcp) |
+
+**セキュリティ境界:** Atlas Shield は HTTP MCP トランスポートを備えていません。Google Developer Knowledge のような HTTP 専用サービスには、別途信頼性を確認した stdio ブリッジが必要です。テンプレートはブリッジの動作を示す証拠ではありません。実接続は未検証です。上流バイナリー・引数・認証情報の制限と検証は利用者の責任です。**ツール名の字句的なフィルタリングでは、意味的な読み取り専用動作を証明できません**。プロファイルはサーバーの身元を認証しません。サニタイズもプロンプトインジェクションに対する完全な防御ではありません。
+
+### L2: 任意の Sovereign AI Prover
+
+```sh
+node bin/atlas-shield.mjs audit . --prove --prover-mode gemini
+node bin/atlas-shield.mjs audit . --prove --prover-mode dual
+```
+
+**Pure Gemini Sovereign Mode**（既定の `gemini`）は、`gemini-4-argon-high` による独立した `argonArchitect` と `geminiRedTeam` の検証を、Gemini、Vertex AI、または設定した `agy` アダプターで実行します。Google 以外の Prover バックエンドは必要ありません。
+
+`dual` は、`gemini-4-argon-high` による `argonHigh` と、導入・認証済みの `codex` CLI による `astraUltra` を実行します。後者は `gpt-6-astra`、ultra 推論、読み取り専用 sandbox、一時セッションを使用します。アダプターは、設定されていれば `CODEX_HOME` と `OPENAI_API_KEY` を引き継ぎます。どちらのモードも各系統に同一のサニタイズ済み証拠を渡し、系統間で回答を共有しません。
+
+| 設定 | 必要な準備 |
+| --- | --- |
+| `ATLAS_GEMINI_BACKEND=gemini`（既定） | `GEMINI_API_KEY` |
+| `ATLAS_GEMINI_BACKEND=vertex` | `GOOGLE_CLOUD_PROJECT`、`GOOGLE_CLOUD_LOCATION`、`GOOGLE_OAUTH_ACCESS_TOKEN` |
+| `ATLAS_GEMINI_BACKEND=agy` | plan モードと sandbox に対応する、導入・認証済みの `agy` CLI。 |
+| `--prover-mode dual` | 上記 Google バックエンドのいずれかと、導入・認証済みの `codex` CLI。設定済みの `CODEX_HOME` と `OPENAI_API_KEY` を引き継ぐ。 |
+
+**Non-Majority Fail-Closed Gate** は、ある系統の攻撃成立の主張を多数決で打ち消しません。
+
+| 判定 | 意味 |
+| --- | --- |
+| `BLOCKER` | いずれかの系統が手順と証拠を伴うスキーマに適合した攻撃証明を返した。他方が成功・失敗していても優先する。 |
+| `ERROR` | 有効な攻撃証明がなく、いずれかの系統で空・形式不正の出力、失敗、またはタイムアウトが発生した。 |
+| `PASS` | 両系統が有効な成功応答を返し、与えた証拠から攻撃を成立させられなかった。 |
+
+攻撃証明は**モデルが生成した主張であり、自動実行した攻撃ではありません**。`PASS` は安全性の保証ではありません。ローカル走査が不完全な場合は、Prover を呼び出さず終了コード `2` を返します。
+
+`--prove` はサニタイズ済みの証拠を、選択したプロバイダーまたは CLI に送信します。認証情報、データ境界、保持期間、モデル利用権限、CLI sandbox の強制は環境側で設定する必要があります。モード名は閉域境界や保持ゼロを保証しません。プロバイダーとの実接続とモデルの提供状況は**未検証**です。
+
+### GitHub Actions とローカル検証
+
+Composite action には Node.js **>=22.18.0** が必要です。次の例は Atlas Shield の checkout 内から `uses: ./` を使います。`directory` には checkout 済みの対象を指定してください。オフラインで実行し、CLI の終了コードを保持します。入力は `directory`（既定 `.`）、`format`（既定 `table`）、`fail-on`（既定 `high`）です。この checkout 全体を走査すると意図的な脆弱性 fixture を含むため、終了コード `1` になります。
+
+```yaml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '>=22.18.0 <23'
+      - uses: ./
+        with:
+          directory: .
+          format: table
+          fail-on: high
+```
+
+固定した Action のバージョン: [checkout v4.2.2](https://github.com/actions/checkout/releases/tag/v4.2.2)、[setup-node v4.4.0](https://github.com/actions/setup-node/releases/tag/v4.4.0)。
+
+ローカル検証は次の順で実行します。
+
+```sh
+npm run check
+npm test
+```
+
+決定論的なパーサーの実時間上限テストが他のテストワーカーと競合しないよう、テストファイルは直列実行します。アサーションとヒープ上限は有効なまま維持します。

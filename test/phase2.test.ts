@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import test from 'node:test';
 import type { TestContext } from 'node:test';
@@ -342,20 +342,239 @@ test('SCC Cloud Run and Functions aliases join only the matching runtime identit
 
 test('audit and SCC discovery uses bounded filename tokens and ignores unrelated words', (t) => {
   const directory = temporary(t);
-  const audits = ['audit.json', 'events.audit.ndjson', 'cloud-audit.ndjson', 'cloudaudit.json', 'audit_logs.json', 'projectAuditLogs.json'];
+  const audits = ['cloud-audit.json', 'cloud-audit.ndjson', 'cloudaudit.json', 'gcp-audit.json', 'gcpaudit.ndjson',
+    'audit-log.json', 'audit_logs.json', 'events.audit-logs.ndjson', 'projectAuditLogs.json', 'serviceCloudAudit.json', 'projectGcpAuditLogs.json'];
   const findings = ['scc.json', 'scc-findings.json', 'projectSccReport.json', 'scc_export.json', 'sccFindings.json'];
   const decoys = ['plaudit.json', 'plaudit.ndjson', 'auditorium.json', 'fraudit.json', 'audio.json',
+    'audit.json', 'audit.ndjson', 'events.audit.json', 'events.audit.ndjson', 'npm-audit.json', 'lighthouse.audit.json',
+    '20261011_chore-media-editorial-batch1.audit.json', 'auditlogger.json', 'cloudauditor.json',
     'soccer.json', 'broccoli.json', 'success.json', 'sccm.json', 'asccode.json'];
-  for (const file of audits) { assert.equal(isAuditLogFilename(file), true, file); writeFileSync(join(directory, file), '{}'); }
-  for (const file of findings) { assert.equal(isSccFindingsFilename(file), true, file); writeFileSync(join(directory, file), '{}'); }
   for (const file of decoys) {
     assert.equal(isAuditLogFilename(file), false, file);
     assert.equal(isSccFindingsFilename(file), false, file);
     writeFileSync(join(directory, file), '{broken');
   }
+  assert.deepEqual(scanDirectory(directory).findings, []);
+  assert.equal(cli(['audit', directory, '--format', 'json']).status, 0);
+  for (const file of audits) { assert.equal(isAuditLogFilename(file), true, file); writeFileSync(join(directory, file), '{}'); }
+  for (const file of findings) { assert.equal(isSccFindingsFilename(file), true, file); writeFileSync(join(directory, file), '{}'); }
   const graph = scanDirectory(directory);
   assert.ok(graph.findings.every(finding => finding.ruleId === 'scan/invalid-input'));
   assert.deepEqual(graph.findings.map(finding => finding.location.file).sort(), [...audits, ...findings].sort());
+});
+
+test('polyglot generated directories skip broken links, decoy inputs and oversized cache trees', (t) => {
+  const directory = temporary(t);
+  const excluded = ['.git', 'node_modules', '.pnpm-store', '.yarn', 'Pods',
+    '.fvm', '.dart_tool', '.symlinks', '.plugin_symlinks',
+    '.venv', 'venv', '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache',
+    '.gradle', 'build', '.build', '_build', 'dist', 'target', 'DerivedData',
+    '.next', '.nuxt', '.svelte-kit', '.astro', '.turbo', '.parcel-cache',
+    '.firebase', '.terraform', '.wrangler', '.vercel',
+    '.worktrees', '.claude', '.agents', '.codex', '.gemini', 'coverage'];
+  const source = 'service cloud.firestore { match /a { allow read, write: if true; } }';
+  for (const name of excluded) {
+    mkdirSync(join(directory, name));
+    symlinkSync('missing.tf', join(directory, name, 'broken.tf'));
+    writeFileSync(join(directory, name, 'vulnerable.firestore.rules.sample'), source);
+  }
+  for (let index = 0; index < 20_006; index++) writeFileSync(join(directory, '.terraform', `${index}.cache`), '');
+  // Repeated exclusions at different depths must share one deterministic note.
+  mkdirSync(join(directory, 'packages', 'example', 'build'), { recursive: true });
+  symlinkSync('missing.tf', join(directory, 'packages', 'example', 'build', 'broken.tf'));
+  const graph = scanDirectory(directory);
+  assert.deepEqual(graph.findings, []);
+  assert.deepEqual(graph.limitations.filter(note => note.startsWith('Excluded generated,')), [
+    `Excluded generated, cache, or worktree directories were not traversed: ${excluded.filter(name => name !== '.git' && name !== 'node_modules').sort().join(', ')}. Audit a subdirectory directly if infrastructure configs reside there.`,
+  ]);
+  const result = cli(['audit', directory, '--format', 'json']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), graph);
+
+  writeFileSync(join(directory, 'build', 'custom.rules'), source);
+  writeFileSync(join(directory, 'firebase.json'), JSON.stringify({ firestore: { rules: 'build/custom.rules' } }));
+  const configured = cli(['audit', directory, '--format', 'json']);
+  assert.equal(configured.status, 1, configured.stderr);
+  const findings: GraphResult['findings'] = JSON.parse(configured.stdout).findings;
+  assert.ok(findings.some(finding => finding.ruleId === 'firebase/public-write' && finding.location.file === 'build/custom.rules'));
+  assert.ok(findings.every(finding => finding.location.file === 'build/custom.rules'));
+});
+
+test('explicit scan roots inside excluded directories still analyze their own inputs', (t) => {
+  const regularRoot = temporary(t);
+  writeFileSync(join(regularRoot, 'build'), 'Local build script.');
+  const regularGraph = scanDirectory(regularRoot);
+  assert.deepEqual(regularGraph.findings, []);
+  assert.equal(regularGraph.limitations.some(note => note.startsWith('Excluded generated,')), false);
+  assert.equal(cli(['audit', regularRoot, '--format', 'json']).status, 0);
+
+  const directory = temporary(t);
+  for (const name of ['build', '.worktrees/branch']) {
+    const scanRoot = join(directory, name);
+    mkdirSync(scanRoot, { recursive: true });
+    writeFileSync(join(scanRoot, 'vulnerable.firestore.rules.sample'), 'service cloud.firestore { match /a { allow get; } }');
+    const graph = scanDirectory(scanRoot);
+    assert.deepEqual(graph.findings.map(finding => [finding.ruleId, finding.location.file]),
+      [['firebase/public-read', 'vulnerable.firestore.rules.sample']], name);
+    assert.equal(graph.limitations.some(note => note.startsWith('Excluded generated,')), false);
+    const result = cli(['audit', scanRoot, '--format', 'json']);
+    assert.equal(result.status, 1, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), graph);
+  }
+});
+
+test('intra-repository non-input and Flutter directory links preserve canonical findings without re-traversal', (t) => {
+  const directory = temporary(t);
+  writeFileSync(join(directory, 'ATLAS.md'), 'Local project instructions.');
+  for (const name of ['AGENTS.md', 'notes.yml', 'plaudit.json', 'soccer.json']) {
+    symlinkSync('ATLAS.md', join(directory, name));
+  }
+  assert.deepEqual(scanDirectory(directory).findings, []);
+  assert.equal(cli(['audit', directory, '--format', 'json']).status, 0);
+
+  const canonical = 'packages/ble/ios/Classes', linked = 'packages/ble/macos/Classes';
+  mkdirSync(join(directory, canonical), { recursive: true });
+  mkdirSync(dirname(join(directory, linked)), { recursive: true });
+  writeFileSync(join(directory, canonical, 'main.tf'), 'resource "google_project_iam_member" "public" {\n'
+    + 'project="atlas-fixture" role="roles/secretmanager.secretAccessor" member="allUsers"\n}');
+  symlinkSync('../ios/Classes', join(directory, linked));
+  symlinkSync('.', join(directory, 'self'));
+  const graph = scanDirectory(directory);
+  assert.equal(graph.findings.filter(finding => finding.ruleId === 'scan/unsafe-path').length, 0);
+  assert.deepEqual(graph.findings.map(finding => [finding.ruleId, finding.location.file]),
+    [['gcp/public-service', `${canonical}/main.tf`]]);
+  for (const [file, target] of [[linked, canonical], ['self', '.']]) {
+    assert.ok(graph.limitations.includes(`${file}: Intra-repository directory symlink was not re-traversed; canonical target ${target} is scanned directly.`));
+  }
+  const result = cli(['audit', directory, '--format', 'json']);
+  assert.equal(result.status, 1, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), graph);
+});
+
+test('symlinked security input filenames always fail closed even for regular intra-root targets', (t) => {
+  const directory = temporary(t);
+  writeFileSync(join(directory, 'safe.txt'), '{}');
+  // Separate case variants so the fixture also works on case-insensitive filesystems.
+  const inputs = ['infra/main.tf', 'MAIN.TF', 'iam.json', 'projectIamPolicy.json', 'firestore.rules', 'storage.rules', 'firebase.json',
+    'scc.json', 'projectSccReport.json', 'cloud-audit.json', 'audit-logs.ndjson',
+    'vulnerable.firestore.rules.sample', 'vulnerable.storage.rules.sample', 'github-wif.yml', 'github-wif.YAML',
+    '.github/workflows/ci.yml', 'packages/app/.github/workflows/ci.yaml', 'packages/app/.github/workflows/DEPLOY.YML'];
+  for (const file of inputs) {
+    mkdirSync(dirname(join(directory, file)), { recursive: true });
+    symlinkSync(join(directory, 'safe.txt'), join(directory, file));
+  }
+  const graph = scanDirectory(directory);
+  assert.deepEqual(graph.findings.map(finding => finding.location.file).sort(), [...inputs].sort());
+  assert.ok(graph.findings.every(finding => finding.ruleId === 'scan/unsafe-path'));
+  const result = cli(['audit', directory, '--format', 'json']);
+  assert.equal(result.status, 2, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), graph);
+});
+
+test('uppercase Terraform and workflow extensions are discovered and parsed', (t) => {
+  const directory = temporary(t);
+  writeFileSync(join(directory, 'MAIN.TF'), 'resource "google_project_iam_member" "reader" {\n'
+    + `project="atlas-fixture" role="roles/secretmanager.secretAccessor" member="serviceAccount:${account}"\n}`);
+  const workflows = ['packages/app/.github/workflows/DEPLOY.YML', 'github-wif.YAML'];
+  for (const file of workflows) {
+    mkdirSync(dirname(join(directory, file)), { recursive: true });
+    writeFileSync(join(directory, file), 'jobs:\n  deploy:\n    steps:\n      - uses: google-github-actions/auth@v3\n'
+      + '        with:\n          workload_identity_provider: projects/123/locations/global/workloadIdentityPools/ci/providers/github\n'
+      + `          service_account: ${account}\n`);
+  }
+  const graph = scanDirectory(directory);
+  assert.equal(graph.findings.some(finding => finding.ruleId.startsWith('scan/')), false);
+  for (const file of workflows) {
+    assert.ok(graph.paths.some(path => path.nodes[0] === `entry:workflow:${file}:4`
+      && path.nodes.includes(`identity:${account}`) && path.description.includes('Secret Manager')), file);
+  }
+});
+
+test('broken, outside, excluded-target and GitHub path symlinks fail closed', async (t) => {
+  const directory = temporary(t);
+  const cases = [
+    ['outside-file', 'AGENTS.md', 'outside.txt', false, true],
+    ['outside-directory', 'infra', 'outside-dir', true, true],
+    ['broken', 'AGENTS.md', 'missing.md', false, false],
+    ['excluded-worktree', 'infra', '.worktrees/hidden', true, false],
+    ['excluded-build', 'infra', 'build/tf', true, false],
+    ['excluded-file-target', 'AGENTS.md', '.worktrees/hidden/doc.md', false, false],
+    ['excluded-build-file-target', 'AGENTS.md', 'build/file', false, false],
+    ['nested-exclusion', 'infra', 'packages/plugin/.build/tf', true, false],
+    ['github-directory', '.github', 'ci-dir', true, false],
+    ['github-workflows', '.github/workflows', 'ci-dir', true, false],
+    ['github-file', '.github/AGENTS.md', 'safe.txt', false, false],
+    ['nested-github', 'packages/app/.github', 'ci-dir', true, false],
+    ['nested-github-workflows', 'packages/app/.github/workflows', 'ci-dir', true, false],
+    ['target-github-file', 'notes.txt', '.github/workflows/ci.yml', false, false],
+    ['target-github-non-input', 'notes.txt', '.github/notes.md', false, false],
+    ['alias-to-security-input', 'notes.txt', 'main.tf', false, false],
+    ['input-directory', 'main.tf', 'infra-dir', true, false],
+  ] as const;
+  for (const [label, file, target, isDirectory, outside] of cases) await t.test(label, () => {
+    const scanRoot = join(directory, label), targetPath = join(outside ? directory : scanRoot, target);
+    mkdirSync(dirname(join(scanRoot, file)), { recursive: true });
+    if (isDirectory) mkdirSync(targetPath, { recursive: true });
+    else if (label !== 'broken') {
+      mkdirSync(dirname(targetPath), { recursive: true });
+      writeFileSync(targetPath, 'Local text.');
+    }
+    symlinkSync(targetPath, join(scanRoot, file));
+    const graph = scanDirectory(scanRoot);
+    diagnosticOnly(graph, 'scan/unsafe-path');
+    assert.equal(graph.findings[0].location.file, file);
+    if (label.startsWith('excluded') || label === 'nested-exclusion') {
+      assert.equal(graph.findings[0].evidence, 'Symbolic links to excluded directories are not followed.');
+    }
+    const result = cli(['audit', scanRoot, '--format', 'json']);
+    assert.equal(result.status, 2, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), graph);
+  });
+});
+
+test('explicit Firebase references still reject input links, linked parents and protected directories', async (t) => {
+  for (const rules of ['AGENTS.md', 'linked/custom.rules', '.git/custom.rules', 'node_modules/custom.rules']) {
+    await t.test(rules, (t) => {
+      const directory = temporary(t);
+      mkdirSync(join(directory, 'rules'));
+      writeFileSync(join(directory, 'rules/custom.rules'), 'service cloud.firestore { match /a { allow get; } }');
+      symlinkSync('rules/custom.rules', join(directory, 'AGENTS.md'));
+      symlinkSync('rules', join(directory, 'linked'));
+      for (const name of ['.git', 'node_modules']) {
+        mkdirSync(join(directory, name));
+        writeFileSync(join(directory, name, 'custom.rules'), 'service cloud.firestore { match /a { allow get; } }');
+      }
+      writeFileSync(join(directory, 'firebase.json'), JSON.stringify({ firestore: { rules } }));
+      const result = cli(['audit', directory, '--format', 'json']);
+      assert.equal(result.status, 2, result.stderr);
+      const graph: GraphResult = JSON.parse(result.stdout);
+      diagnosticOnly(graph, 'scan/unsafe-path');
+      assert.equal(graph.findings[0].location.file, rules);
+    });
+  }
+});
+
+test('symlinks to intra-root special files fail closed without blocking', (t) => {
+  for (const parent of ['build', 'ipc']) {
+    const directory = temporary(t);
+    mkdirSync(join(directory, parent));
+    const fifo = spawnSync('mkfifo', [join(directory, parent, 'pipe')], { encoding: 'utf8', timeout: 1000 });
+    assert.ifError(fifo.error);
+    assert.equal(fifo.status, 0, fifo.stderr);
+    symlinkSync(`${parent}/pipe`, join(directory, 'AGENTS.md'));
+    const result = cli(['audit', directory, '--format', 'json']);
+    assert.equal(result.status, 2, result.stderr);
+    const graph: GraphResult = JSON.parse(result.stdout);
+    const expected = [['AGENTS.md', parent === 'build'
+      ? 'Symbolic links to excluded directories are not followed.'
+      : 'Symbolic links are not followed; linked inputs were not analyzed.']];
+    if (parent === 'ipc') expected.push(['ipc/pipe', 'Non-regular filesystem entries are not read.']);
+    assert.deepEqual(graph.findings.map(finding => [finding.location.file, finding.evidence]).sort(), expected);
+    assert.ok(graph.findings.every(finding => finding.ruleId === 'scan/unsafe-path' && finding.severity === 'high'));
+    assert.deepEqual(graph.nodes, []);
+    assert.deepEqual(graph.edges, []);
+    assert.deepEqual(graph.paths, []);
+  }
 });
 
 test('new telemetry parsers remove credentials and controls before graph storage and prover framing', async () => {
@@ -394,14 +613,14 @@ test('incomplete audit and SCC scans return exit 2 without starting requested pr
   writeFileSync(join(directory, 'agy'), fake, { mode: 0o700 });
   writeFileSync(join(directory, 'codex'), fake, { mode: 0o700 });
   for (const [file, source, rule] of [
-    ['audit.json', JSON.stringify([audit(), {}]), 'scan/invalid-input'],
+    ['cloud-audit.json', JSON.stringify([audit(), {}]), 'scan/invalid-input'],
     ['scc.json', JSON.stringify([scc(), {}]), 'scan/invalid-input'],
-    ['audit.json', JSON.stringify({ entries: Array(10_001).fill({ protoPayload: { methodName: 'List', serviceName: 'x' } }) }), 'scan/input-limit'],
+    ['cloud-audit.json', JSON.stringify({ entries: Array(10_001).fill({ protoPayload: { methodName: 'List', serviceName: 'x' } }) }), 'scan/input-limit'],
     ['scc.json', JSON.stringify(Array(10_001).fill({ category: 'X', resourceName: 'projects/p' })), 'scan/input-limit'],
-    ['audit.json', ' '.repeat(1024 * 1024 + 1), 'scan/input-limit'],
+    ['cloud-audit.json', ' '.repeat(1024 * 1024 + 1), 'scan/input-limit'],
     ['scc.json', ' '.repeat(1024 * 1024 + 1), 'scan/input-limit'],
   ]) {
-    writeFileSync(join(directory, 'audit.json'), '[]');
+    writeFileSync(join(directory, 'cloud-audit.json'), '[]');
     writeFileSync(join(directory, 'scc.json'), '[]');
     writeFileSync(join(directory, file), source);
     const result = cli(['audit', directory, '--format', 'json', '--prove', '--prover-mode', 'dual'], {

@@ -82,7 +82,7 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
 - [x] **Task-8: Cloud Audit Logs Threat-Hunting Parser & Runtime Attack-Graph Correlation**
   - **Target Files**: `src/graph/audit-log-parser.ts`, `src/graph/attack-graph.ts`, `src/report/remediation.ts`
   - **Scope**:
-    - Parse exported GCP Cloud Audit Logs in JSON array (`[...]`), `{ entries: [...] }`, or NDJSON line format (`*.audit.json`, `*.audit.ndjson`, and token/camelCase-bounded `*cloudaudit*.json`, `*audit-logs*.json`, `*audit_logs*.json` — never matching unrelated filenames like `plaudit.json`!).
+    - Parse exported GCP Cloud Audit Logs in JSON array (`[...]`), `{ entries: [...] }`, or NDJSON line format. Collision-free discovery requires explicit `cloud-audit` / `cloudaudit` / `gcp-audit` / `audit-log(s)` token or camelCase boundaries in `.json` / `.ndjson` filenames (for example, `cloud-audit.json`, `gcpaudit.ndjson`, `audit_logs.json`, `projectAuditLogs.json`). Ignore generic `audit.json` / `npm-audit.json` / `*.audit.json` / `*.audit.ndjson` tool reports and unrelated words such as `plaudit.json` or `cloudauditor.json`.
     - Detect and graph-correlate four high-severity attack classes with bounded field lengths (`<= 512` chars) and `<= 10,000` records per file:
       1. `audit/logging-tampering` (`blocker` for `DeleteSink` / `UpdateSink` disabling sink or removing `auditConfigs`; `high` for suspicious exclusion filter changes).
       2. `audit/iam-persistence` (`high` for `CreateServiceAccountKey`, `CreateWorkloadIdentityPoolProvider` / `UpdateWorkloadIdentityPoolProvider` without `attributeCondition`, or `SetIamPolicy` bindings granting powerful/escalation roles or public `allUsers`/`allAuthenticatedUsers`).
@@ -106,3 +106,33 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
     - Add realistic vulnerable & hardened Cloud Audit Log + SCC fixtures (verifying `audit fixtures/hardened-enterprise` still exits `0` with zero `high`/`blocker` findings or attack paths, and `audit fixtures/vulnerable-enterprise` correlates SCC + Cloud Audit Logs + Terraform + IAM + WIF + Firebase Rules!).
     - Update `README.md` (EN/JA) with `--profile`, `mcp-config`, Cloud Audit Logs threat hunting, and SCC posture correlation examples.
     - Add exhaustive tests in `test/phase2.test.ts` (and existing test files) including `< 350 ms` / `256 MiB` heap-cap dense benchmarks for `parseAuditLogs` and `parseSccFindings`, filename word-boundary tests (`plaudit.json`, `soccer.json` ignored), untrusted log prompt-injection/secret sanitization tests, and profile enforcement tests. Mark `Task-7`..`Task-10` as `[x]` in `TASK_PLAN.md` upon passing `npm run check` and `npm test`.
+
+---
+
+## Phase 2.1 Frozen Order (v0.2.1)
+
+### Goal, Invariants & Non-Goals
+- Make root audits usable in polyglot repositories with collision-free Cloud Audit Logs filename discovery and exclusions for standard generated, SDK, cache, and worktree child directories, while preserving fail-closed diagnostics for unsafe or unanalyzed symlinks.
+- Apply exclusions only to children encountered during traversal; explicitly requested roots remain scannable. Report skipped names deterministically, except `.git` and `node_modules`.
+- Keep `readSafeSource` unchanged: reject all symlink components, root escapes, `.git`, and `node_modules`; safely analyze explicit Firebase Rules references in other excluded directories.
+- Reject recognized security input links and aliases to them, broken/out-of-root links, `.github` segments in either link or canonical target paths, excluded file/directory targets, and special targets. Check excluded and symlinked target components before accepting files or directories. Ignore ordinary intra-root non-input file links; record a limitation for directory links whose canonical targets are reachable without excluded or symlinked components, without re-traversing them.
+- Preserve zero runtime/development dependencies, offline operation, read-only target handling, traversal/input bounds, and every existing feature. The legacy agent-state directory exclusion is defensive filesystem handling only; it adds no vendor integration.
+- **Allowed Files**: `ATLAS.md`, `TASK_PLAN.md`, `README.md`, `package.json`, `src/graph/attack-graph.ts`, `test/phase2.test.ts`.
+- **Do Not**: Change other files, add repository files/directories or dependencies, modify Git metadata/index, perform release builds, commit/push/PR/publish/deploy, or change live Rules. Independent Google audit is required after local verification; implementation is never self-certified.
+
+### Task List
+- [x] **Task-11: Collision-Free Cloud Audit Discovery, Polyglot Exclusions & Safe Intra-Repository Symlink Handling**
+  - **Target Files**: `src/graph/attack-graph.ts`, `test/phase2.test.ts`, `package.json`, `ATLAS.md`, `README.md`, `TASK_PLAN.md`.
+  - **Scope**: Export `EXCLUDED_DIRS`, require explicit cloud/GCP audit or audit-log(s) filename boundaries, share case-insensitive Terraform/workflow input recognition with parser dispatch and symlink checks, enforce canonical target checks before accepting file/directory links, report deterministic limitations without misclassifying regular files named `build`, maintain `0.2.1`, and synchronize canonical and EN/JA docs while preserving the CI Node.js version range.
+  - **Regression Coverage**: Explicit audit tokens/camelCase and ignored generic tool reports (clean exit `0`); generated/cache trees with more than 20,005 files and broken links; regular `build` files, direct excluded-root audits, explicit Rules references, intra-root file/Flutter directory links, uppercase `.TF` / `.YML` / `.YAML` discovery and dispatch, nested/target `.github` paths, aliases to security inputs, and excluded file/directory targets with exact diagnostics and CLI exit `2`.
+  - **Local Verification**: Final collision-free discovery and symlink polish passed `npm run check` and `npm test` (both exit `0`; 189 tests passed, 0 failed/skipped; Node.js v22.19.0). Repository-root audit reports zero `scan/*` errors; existing vulnerable fixtures still produce security findings. Independent Google audit remains pending; local results do not certify release approval.
+
+- [x] **Task-12: OSS `README.md` Structural Redesign (Dedicated English & Japanese Sections, Mermaid Architecture Diagram & Reference Tables)**
+  - **Target Files**: `README.md`, `TASK_PLAN.md`.
+  - **Scope**: Replace the interleaved 2-line EN/JA layout in `README.md` with a shared top header + `[English](#english) · [日本語](#日本語)` jump links + a compact Mermaid `flowchart LR` 3-layer architecture diagram, followed by dedicated `## English` and `## 日本語` sections with full technical, command, table, and security-boundary parity (including L0 rule/severity reference table, L1 7 Airlock profiles table using existing verified upstream links and `src/airlock/profiles.ts` templates, L2 prover backend table, and GitHub Actions YAML preserving `node-version: '>=22.18.0 <23'`). Mark `Task-12` `[x]` in `TASK_PLAN.md` after `npm run check` and `npm test` exit `0`.
+  - **Do Not**: Modify `src/**`, `test/**`, `bin/**`, `package.json`, `ATLAS.md`, `action.yml`, `.github/**`, or `fixtures/**`; add external badge images or unverified URLs/claims; or alter existing `node-version: '>=22.18.0 <23'` pins.
+  - **Local Verification**: 2026-11-04 JST — `npm run check` and `npm test` both exited `0` (189 passed, 0 failed/skipped; Node.js v22.19.0); EN/JA commands, tables, technical values, source profile templates, URL allowlist and Node.js pins checked. Independent Google audit remains pending; this is not release approval.
+
+### Acceptance Criteria
+1. `npm run check` (exits `0`)
+2. `npm test` (exits `0`)

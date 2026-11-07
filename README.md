@@ -19,6 +19,38 @@ flowchart LR
   passes --> gate["Non-Majority Fail-Closed Gate: BLOCKER / ERROR / PASS"]
 ```
 
+<details>
+<summary><strong>Global Overview (20 Languages) / 20言語クイック概要</strong></summary>
+
+> **Note:** The [English](#english) and [日本語](#日本語) sections below are the sole authoritative technical and security-boundary specifications for Atlas Shield, defining all CLI flags, input bounds, and operational guarantees. In particular: exit code `0` is not an absolute completeness or security guarantee, lexical MCP Airlock filtering does not mathematically prove semantic read-only execution, secret and prompt sanitization is not an exhaustive prompt-injection defense, and `--prove` transmits sanitized evidence under caller-configured provider settings and mode names do not guarantee a closed perimeter or zero retention.
+>
+> **注記:** 以下の [English](#english) および [日本語](#日本語) セクションが、すべてのCLIフラグ、入力上限、および運用上の保証を規定する唯一の正式な技術・セキュリティ境界仕様です。特に、終了コード `0` は完全性や安全性の絶対的保証ではなく、Airlockの字句フィルタリングは意味論的な読み取り専用動作を完全に証明するものではなく、サニタイズは網羅的なプロンプト注入防御ではなく、`--prove` は呼び出し側が設定したプロバイダー設定の下でサニタイズ済み証拠を送信し、モード名は閉じた境界やゼロ保持を保証しません。
+
+| Language | Tag | Summary |
+| --- | --- | --- |
+| English | `en` | An offline-by-default GCP × Firebase cross-boundary attack-path analyzer, read-only MCP Airlock, and optional AI evidence reviewer (Apache-2.0, Node.js >=22.18.0, 0 npm dependencies). Authoritative specifications and security limits are governed exclusively by the [English](#english) and [日本語](#日本語) sections. |
+| 日本語 (Japanese) | `ja` | 既定でオフライン動作するGCP × Firebase横断攻撃経路アナライザー、読み取り専用MCP Airlock、および任意のAI証拠レビュー機能を提供します（Apache-2.0、Node.js >=22.18.0、npm依存関係0）。完全な仕様およびセキュリティ境界は [English](#english) および [日本語](#日本語) セクションが正本となります。 |
+| 简体中文 (Simplified Chinese) | `zh-Hans` | 默认离线的 GCP × Firebase 跨边界攻击路径分析器、只读 MCP Airlock 以及可选的 AI 证据审查工具（Apache-2.0、Node.js >=22.18.0、0 npm 依赖）。权威技术规范与安全边界完全由 [English](#english) 与 [日本語](#日本語) 章节规定。 |
+| 繁體中文 (Traditional Chinese) | `zh-Hant` | 預設離線的 GCP × Firebase 跨邊界攻擊路徑分析器、唯讀 MCP Airlock 以及選配的 AI 證據審查工具（Apache-2.0、Node.js >=22.18.0、0 npm 相依性）。正式技術規範與安全邊界完全由 [English](#english) 與 [日本語](#日本語) 章節規範。 |
+| 한국어 (Korean) | `ko` | 기본 오프라인으로 동작하는 GCP × Firebase 교차 경계 공격 경로 분석기, 읽기 전용 MCP Airlock 및 선택적 AI 증거 검토 도구입니다(Apache-2.0, Node.js >=22.18.0, npm 의존성 0개). 공식 기술 사양 및 보안 경계는 [English](#english) 및 [日本語](#日本語) 섹션에 따릅니다. |
+| Español (Spanish) | `es` | Analizador de rutas de ataque entre límites de GCP y Firebase sin conexión por defecto, Airlock MCP de solo lectura y revisor de evidencia de IA opcional (Apache-2.0, Node.js >=22.18.0, 0 dependencias npm). Las especificaciones autorizadas y límites de seguridad se rigen por las secciones [English](#english) y [日本語](#日本語). |
+| Português (Portuguese) | `pt` | Analisador de caminhos de ataque entre fronteiras GCP e Firebase padrão offline, Airlock MCP somente leitura e revisor de evidências de IA opcional (Apache-2.0, Node.js >=22.18.0, 0 dependências npm). Especificações oficiais e limites de segurança são regidos pelas seções [English](#english) e [日本語](#日本語). |
+| Français (French) | `fr` | Analyseur de chemins d'attaque inter-frontières GCP et Firebase hors ligne par défaut, Airlock MCP en lecture seule et réviseur de preuves IA optionnel (Apache-2.0, Node.js >=22.18.0, 0 dépendance npm). Les spécifications officielles et limites de sécurité sont régies par les sections [English](#english) et [日本語](#日本語). |
+| Deutsch (German) | `de` | Standardmäßig offline arbeitender Analyse-Dienst für GCP × Firebase grenzüberschreitende Angriffspfade, schreibgeschützter MCP-Airlock und optionale KI-Beweisprüfung (Apache-2.0, Node.js >=22.18.0, 0 npm-Abhängigkeiten). Maßgebliche Spezifikationen und Sicherheitsgrenzen werden ausschließlich durch die Abschnitte [English](#english) und [日本語](#日本語) geregelt. |
+| Italiano (Italian) | `it` | Analizzatore di percorsi di attacco tra confini GCP e Firebase offline per impostazione predefinita, MCP Airlock di sola lettura e revisore opzionale delle prove IA (Apache-2.0, Node.js >=22.18.0, 0 dipendenze npm). Le specifiche autorevoli e i limiti di sicurezza sono regolati dalle sezioni [English](#english) e [日本語](#日本語). |
+| Русский (Russian) | `ru` | Работающий по умолчанию офлайн анализатор путей атак между периметрами GCP и Firebase, доступный только для чтения шлюз MCP Airlock и опциональный инструмент проверки свидетельств с помощью ИИ (Apache-2.0, Node.js >=22.18.0, 0 зависимостей npm). Полные официальные спецификации и границы безопасности определяются разделами [English](#english) и [日本語](#日本語). |
+| Українська (Ukrainian) | `uk` | Аналізатор міжпериметрових шляхів атак GCP та Firebase, що за замовчуванням працює офлайн, доступний лише для читання шлюз MCP Airlock і додатковий інструмент перевірки доказів засобами ШІ (Apache-2.0, Node.js >=22.18.0, 0 залежностей npm). Офіційні специфікації та межі безпеки регулюються виключно розділами [English](#english) і [日本語](#日本語). |
+| Polski (Polish) | `pl` | Domyślnie działający offline analizator ścieżek ataków ponad granicami GCP i Firebase, blokada MCP Airlock tylko do odczytu oraz opcjonalny moduł weryfikacji dowodów przez SI (Apache-2.0, Node.js >=22.18.0, 0 zależności npm). Wiążące specyfikacje i ograniczenia bezpieczeństwa są określone w sekcjach [English](#english) i [日本語](#日本語). |
+| Nederlands (Dutch) | `nl` | Standaard offline analyseprogramma voor aanvalspaden over GCP- en Firebase-grenzen, alleen-lezen MCP Airlock en optionele AI-bewijsevaluatie (Apache-2.0, Node.js >=22.18.0, 0 npm-afhankelijkheden). Gezaghebbende specificaties en veiligheidsgrenzen worden bepaald door de secties [English](#english) en [日本語](#日本語). |
+| Türkçe (Turkish) | `tr` | Varsayılan olarak çevrimdışı çalışan GCP × Firebase sınırlar arası saldırı yolu analizcisi, salt okunur MCP Airlock ve isteğe bağlı yapay zeka kanıt inceleyicisi (Apache-2.0, Node.js >=22.18.0, 0 npm bağımlılığı). Yetkili özellikler ve güvenlik sınırları yalnızca [English](#english) ve [日本語](#日本語) bölümleri tarafından belirlenir. |
+| العربية (Arabic) | `ar` | محلل مسارات الهجوم عبر حدود GCP و Firebase يعمل دون اتصال بشكل افتراضي، مع حاجز MCP Airlock للقراءة فقط ومراجع أدلة اختياري بالذكاء الاصطناعي (ترخيص Apache-2.0، وNode.js >=22.18.0، و0 تبعيات npm). المواصفات المعتمدة وحدود الأمان محددة حصريا في قسمي [English](#english) و[日本語](#日本語). |
+| हिन्दी (Hindi) | `hi` | डिफ़ॉल्ट रूप से ऑफ़लाइन GCP × Firebase क्रॉस-बाउंड्री अटैक-पाथ विश्लेषक, केवल-पढ़ने योग्य MCP Airlock, और वैकल्पिक AI साक्ष्य समीक्षक (Apache-2.0, Node.js >=22.18.0, 0 npm निर्भरताएँ)। आधिकारिक विनिर्देश और सुरक्षा सीमाएँ [English](#english) और [日本語](#日本語) अनुभागों द्वारा शासित हैं। |
+| Bahasa Indonesia (Indonesian) | `id` | Penganalisis jalur serangan lintas batas GCP × Firebase yang default offline, MCP Airlock khusus baca, dan peninjau bukti AI opsional (Apache-2.0, Node.js >=22.18.0, 0 dependensi npm). Spesifikasi resmi dan batasan keamanan diatur oleh bagian [English](#english) dan [日本語](#日本語). |
+| Tiếng Việt (Vietnamese) | `vi` | Công cụ phân tích đường dẫn tấn công xuyên ranh giới GCP × Firebase mặc định ngoại tuyến, MCP Airlock chỉ đọc và bộ đánh giá bằng chứng AI tùy chọn (Apache-2.0, Node.js >=22.18.0, 0 phụ thuộc npm). Quy chuẩn kỹ thuật chính thức và giới hạn an ninh được quy định bởi phần [English](#english) và [日本語](#日本語). |
+| ไทย (Thai) | `th` | เครื่องมือวิเคราะห์เส้นทางการโจมตีข้ามขอบเขต GCP × Firebase ที่ทำงานแบบออฟไลน์โดยเริ่มต้น, MCP Airlock แบบอ่านอย่างเดียว และตัวตรวจสอบหลักฐาน AI ทางเลือก (Apache-2.0, Node.js >=22.18.0, 0 การพึ่งพา npm) ข้อมูลจำเพาะและขอบเขตความปลอดภัยอย่างเป็นทางการถูกกำหนดโดยส่วน [English](#english) และ [日本語](#日本語) |
+
+</details>
+
 ## English
 
 ### Why Atlas Shield

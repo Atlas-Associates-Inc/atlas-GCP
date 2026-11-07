@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import test from 'node:test';
 import type { TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { TextDecoder } from 'node:util';
 import { parseAuditLogs } from '../src/graph/audit-log-parser.ts';
 import { parseSccFindings } from '../src/graph/scc-findings-parser.ts';
 import { findAttackPaths, isAuditLogFilename, isSccFindingsFilename, mergeGraphs, scanDirectory } from '../src/graph/attack-graph.ts';
@@ -56,6 +57,53 @@ function diagnosticOnly(graph: GraphResult, ruleId: string): void {
   assert.deepEqual(graph.edges, []);
   assert.deepEqual(graph.paths, []);
 }
+
+test('OSS governance documents are bilingual, safe UTF-8 files and preserve repository scan coverage', () => {
+  const privateKeyHeader = new RegExp(['-----BEGIN', '(?:[A-Z0-9]+ )*PRIVATE KEY-----'].join(' '), 'i');
+  const bidiOrZeroWidth = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/;
+  const hasUnsupportedModelToken = (text: string): boolean => {
+    const stripped = text.replace(/(?<!-)\bgemini(?:-3\.8-flash-high|\s+3\.8\s+flash\s+high)\b(?!-)/gi, '');
+    return /\b(?:claude|anthropic|fable|opus|sonnet|haiku|nano|mini|lite|flash|argon-(?:low|medium))\b/i.test(stripped);
+  };
+  for (const file of ['SECURITY.md', 'CONTRIBUTING.md', 'README.md']) {
+    const path = join(root, file);
+    assert.ok(lstatSync(path).isFile(), `${file} must be a regular file, not a symlink`);
+    const source = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(readFileSync(path));
+    assert.ok(source.trim().length > 0, `${file} must not be empty`);
+    assert.notEqual(source.charCodeAt(0), 0xfeff, `${file} must not contain a UTF-8 BOM`);
+    assert.doesNotMatch(source, bidiOrZeroWidth, `${file} must not contain invisible BiDi or zero-width characters`);
+    for (const anchor of ['[English](#english)', '[日本語](#日本語)']) assert.ok(source.includes(anchor), `${file}: ${anchor}`);
+    assert.match(source, /^## English\r?$/m, file);
+    assert.match(source, /^## 日本語\r?$/m, file);
+    assert.doesNotMatch(source, privateKeyHeader, `${file} must not contain PEM private-key headers`);
+    assert.equal(hasUnsupportedModelToken(source), false, `${file} must not reference unsupported vendors or tiers`);
+    if (file === 'CONTRIBUTING.md') {
+      for (const required of ['>=22.18.0', 'npm run check', 'npm test']) assert.ok(source.includes(required), `${file}: ${required}`);
+    }
+    if (file === 'README.md') {
+      const detailsMatch = source.match(/<details>([\s\S]*?)<\/details>/);
+      assert.ok(detailsMatch, 'README.md must contain a <details> block');
+      assert.ok(source.includes('<summary><strong>Global Overview (20 Languages) / 20言語クイック概要</strong></summary>'), 'README.md must contain expected summary');
+      const detailsContent = detailsMatch[1];
+      const rows = detailsContent.match(/^\| [^|]+ \| `[a-zA-Z-]+` \|/gm) ?? [];
+      assert.equal(rows.length, 20, 'README.md <details> must contain exact 20 table rows');
+      assert.ok(!detailsContent.includes('[!NOTE]'), 'README.md <details> must not use [!NOTE]');
+      assert.ok(detailsContent.includes('[English](#english)'), 'README.md <details> must delegate to English section');
+      assert.ok(detailsContent.includes('[日本語](#日本語)'), 'README.md <details> must delegate to Japanese section');
+      const tags = ['en', 'ja', 'zh-Hans', 'zh-Hant', 'ko', 'es', 'pt', 'fr', 'de', 'it', 'ru', 'uk', 'pl', 'nl', 'tr', 'ar', 'hi', 'id', 'vi', 'th'];
+      for (const tag of tags) {
+        assert.ok(detailsContent.includes(`\`${tag}\``), `README.md <details> must contain tag \`${tag}\``);
+      }
+    }
+  }
+  assert.equal(hasUnsupportedModelToken('Approved: Gemini 3.8 Flash High, gemini-3.8-flash-high, gemini-4-argon-high, gpt-6-astra.'), false);
+  for (const token of ['flash', 'gemini-3.8-flash', 'flash-lite', 'flash-low', 'flash-medium', 'gemini-3.8-flash-high-lite', 'claude-gemini-3.8-flash-high', 'lite', 'mini', 'nano', 'argon-low', 'argon-medium', 'claude', 'anthropic', 'fable', 'opus', 'sonnet', 'haiku']) {
+    assert.equal(hasUnsupportedModelToken(token), true, token);
+  }
+  const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  assert.deepEqual(packageJson.files, ['bin/', 'src/', 'LICENSE', 'README.md', 'action.yml']);
+  assert.deepEqual(scanDirectory(root).findings.filter(finding => finding.ruleId.startsWith('scan/')), []);
+});
 
 test('audit JSON arrays, entries envelopes, singleton payloads and NDJSON give equivalent detections', () => {
   const record = audit();
@@ -839,4 +887,106 @@ test('generated --upstream-arg= flags roundtrip through CLI parsing without inst
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(JSON.parse(result.stdout).result.args, getAirlockProfile('firebase')?.upstreamArgs);
   assert.deepEqual(readdirSync(directory), ['npx']);
+});
+
+test('installed node_modules package layout executes CLI commands and rejects symlinked src escapes', (t) => {
+  const directory = temporary(t);
+  const pkgDir = join(directory, 'node_modules/@atlas-sec/shield');
+  const binDir = join(directory, 'node_modules/.bin');
+  mkdirSync(pkgDir, { recursive: true });
+  mkdirSync(binDir, { recursive: true });
+
+  const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  cpSync(join(root, 'package.json'), join(pkgDir, 'package.json'));
+  for (const item of packageJson.files) {
+    cpSync(join(root, item), join(pkgDir, item), { recursive: true });
+  }
+
+  const binLink = join(binDir, 'atlas-shield');
+  symlinkSync('../@atlas-sec/shield/bin/atlas-shield.mjs', binLink);
+
+  const run = (args: string[]) => {
+    return spawnSync(process.execPath, args, {
+      cwd: directory,
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: { PATH: process.env.PATH, LANG: 'C' },
+    });
+  };
+
+  const helpResult = run([binLink, '--help']);
+  assert.equal(helpResult.status, 0);
+  assert.ok(helpResult.stdout.startsWith(`Atlas Shield ${packageJson.version}`));
+  assert.ok(!helpResult.stderr.includes('ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING'));
+
+  const versionResult = run(['--preserve-symlinks-main', binLink, '--version']);
+  assert.equal(versionResult.status, 0);
+  assert.equal(versionResult.stdout, `${packageJson.version}\n`);
+
+  const hardenedResult = run([binLink, 'audit', join(root, 'fixtures/hardened-enterprise')]);
+  assert.equal(hardenedResult.status, 0);
+
+  const vulnerableResult = run([binLink, 'audit', join(root, 'fixtures/vulnerable-enterprise'), '--format', 'json']);
+  assert.equal(vulnerableResult.status, 1);
+  const parsedVuln = JSON.parse(vulnerableResult.stdout);
+  assert.ok(parsedVuln.paths.length > 0);
+
+  const outsidePath = join(directory, 'outside.ts');
+  writeFileSync(outsidePath, "process.stdout.write('ESCAPED\\n');\n");
+  symlinkSync(outsidePath, join(pkgDir, 'src/escaped.ts'));
+
+  const cliPath = join(pkgDir, 'src/cli.ts');
+  const cliContent = readFileSync(cliPath, 'utf8');
+  writeFileSync(cliPath, "import './escaped.ts';\n" + cliContent);
+
+  for (const args of [[binLink, '--help'], ['--preserve-symlinks', binLink, '--help']]) {
+    const escapeResult = run(args);
+    assert.equal(escapeResult.status, 2);
+    assert.equal(escapeResult.stdout, '');
+    assert.match(escapeResult.stderr, /Atlas Shield: Refusing to (?:resolve|load) module outside package src directory\./);
+  }
+
+  const linkedSrcPkg = join(directory, 'linked-src-pkg');
+  const externalSrc = join(directory, 'external-src');
+  mkdirSync(join(linkedSrcPkg, 'bin'), { recursive: true });
+  mkdirSync(externalSrc, { recursive: true });
+  cpSync(join(root, 'package.json'), join(linkedSrcPkg, 'package.json'));
+  cpSync(join(root, 'bin/atlas-shield.mjs'), join(linkedSrcPkg, 'bin/atlas-shield.mjs'));
+  writeFileSync(join(externalSrc, 'cli.ts'), "process.stdout.write('EXTERNAL_SRC\\n');\n");
+  symlinkSync(externalSrc, join(linkedSrcPkg, 'src'));
+
+  const externalSrcResult = run([join(linkedSrcPkg, 'bin/atlas-shield.mjs'), '--help']);
+  assert.equal(externalSrcResult.status, 2);
+  assert.equal(externalSrcResult.stdout, '');
+  assert.match(externalSrcResult.stderr, /Atlas Shield: Refusing to load module outside package src directory\./);
+
+  const linkedTarget = join(directory, 'linked-target');
+  const linkedConsumer = join(directory, 'linked-consumer');
+  mkdirSync(linkedTarget, { recursive: true });
+  mkdirSync(join(linkedConsumer, 'node_modules/@atlas-sec'), { recursive: true });
+  mkdirSync(join(linkedConsumer, 'node_modules/.bin'), { recursive: true });
+  cpSync(join(root, 'package.json'), join(linkedTarget, 'package.json'));
+  for (const item of packageJson.files) {
+    cpSync(join(root, item), join(linkedTarget, item), { recursive: true });
+  }
+  symlinkSync(linkedTarget, join(linkedConsumer, 'node_modules/@atlas-sec/shield'));
+  const linkedBin = join(linkedConsumer, 'node_modules/.bin/atlas-shield');
+  symlinkSync('../@atlas-sec/shield/bin/atlas-shield.mjs', linkedBin);
+
+  const linkedVersionResult = run([linkedBin, '--version']);
+  assert.equal(linkedVersionResult.status, 0);
+  assert.equal(linkedVersionResult.stdout, `${packageJson.version}\n`);
+  assert.equal(linkedVersionResult.stderr, '');
+
+  symlinkSync(outsidePath, join(linkedTarget, 'src/escaped.ts'));
+  const linkedCliPath = join(linkedTarget, 'src/cli.ts');
+  const linkedCliContent = readFileSync(linkedCliPath, 'utf8');
+  writeFileSync(linkedCliPath, "import './escaped.ts';\n" + linkedCliContent);
+
+  for (const args of [[linkedBin, '--help'], ['--preserve-symlinks', linkedBin, '--help']]) {
+    const linkedEscapeResult = run(args);
+    assert.equal(linkedEscapeResult.status, 2);
+    assert.equal(linkedEscapeResult.stdout, '');
+    assert.match(linkedEscapeResult.stderr, /Atlas Shield: Refusing to (?:resolve|load) module outside package src directory\./);
+  }
 });

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { hash } from 'node:crypto';
 import type { Finding, GraphNode, GraphResult, Severity } from '../types.ts';
 
 export function emptyGraph(): GraphResult {
@@ -7,7 +7,7 @@ export function emptyGraph(): GraphResult {
 
 export function addFinding(graph: GraphResult, file: string, line: number, ruleId: string,
   severity: Severity, title: string, message: string, evidence: string): Finding {
-  const id = createHash('sha256').update(`${file}\0${line}\0${ruleId}\0${evidence}`).digest().toString('hex', 0, 10);
+  const id = hash('sha256', `${file}\0${line}\0${ruleId}\0${evidence}`, 'hex').slice(0, 20);
   const finding = { id, ruleId, severity, title, message, location: { file, line }, evidence };
   graph.findings.push(finding);
   return finding;
@@ -228,7 +228,7 @@ export function parseFirebaseRules(source: string, file: string,
   };
   const lineIndex = createLineIndex(text), bracePairs = buildBraceMap(text);
   const scopes: Array<{ path: string; start: number; end: number; recursive: boolean; limited: boolean;
-    data: string; resource: string }> = [];
+    data: string; resource: string; resourceLabel: string; dataLabel: string }> = [];
   const active: typeof scopes = [];
   let traversalLimited = false;
   // Keep segments separate so a wildcard's opening brace cannot become the block brace.
@@ -253,6 +253,7 @@ export function parseFirebaseRules(source: string, file: string,
     // A bounded sentinel also suppresses allow clauses inside the skipped subtree.
     const path = limited ? '' : (parent?.path ?? '') + match[1];
     const scope = { start, end, limited, path, data: `data:${kind}:${file}:${path}`, resource: `rules:${file}:${start}`,
+      resourceLabel: `${kind} rules ${path}`, dataLabel: `${kind} data matching ${path}`,
       recursive: (parent?.recursive ?? false) || /\{[^}]+=\*\*\}/.test(match[1]) };
     active.push(scope);
     scopes.push(scope);
@@ -274,28 +275,34 @@ export function parseFirebaseRules(source: string, file: string,
       if (scope.end > offset) active.push(scope);
     }
     if (!active.length || active.at(-1)!.limited) continue;
-    const { path, data, resource } = active.at(-1)!;
-    const read = operations.some(value => ['read', 'get', 'list'].includes(value));
-    const write = operations.some(value => ['write', 'create', 'update', 'delete'].includes(value));
-    const publicAccess = /^\(*\s*true\s*\)*$/.test(condition);
+    const scope = active.at(-1)!;
+    const { path, data, resource, resourceLabel, dataLabel } = scope;
+    let read = false, write = false, writeCreateUpdate = false;
+    for (const op of operations) {
+      if (op === 'read' || op === 'get' || op === 'list') read = true;
+      if (op === 'write' || op === 'create' || op === 'update' || op === 'delete') write = true;
+      if (op === 'write' || op === 'create' || op === 'update') writeCreateUpdate = true;
+    }
+    const publicAccess = condition === 'true' || /^\(*\s*true\s*\)*$/.test(condition);
     if (publicAccess && (read || write)) {
       const findings: Finding[] = [];
       for (const access of [read ? 'read' : '', write ? 'write' : ''].filter(Boolean)) {
         findings.push(addFinding(graph, file, line, `firebase/public-${access}`, 'high',
           `Public ${kind} ${access}`, `The unconditional grant permits unauthenticated ${access} at ${path}.`, evidence));
       }
-      if (read && active.at(-1)!.recursive) findings.push(addFinding(graph, file, line,
+      if (read && scope.recursive) findings.push(addFinding(graph, file, line,
         'firebase/recursive-wildcard', 'high', 'Recursive wildcard exposes descendants',
         `The public read grant covers the recursive match ${path}.`, evidence));
       addNode(entry, 'entry', 'Unauthenticated Firebase client');
-      addNode(resource, 'resource', `${kind} rules ${path}`, line);
-      addNode(data, 'data', `${kind} data matching ${path}`, line);
+      addNode(resource, 'resource', resourceLabel, line);
+      addNode(data, 'data', dataLabel, line);
+      const findingIds = findings.map(value => value.id);
       graph.edges.push({ id: `${findings[0].id}:entry`, from: entry, to: resource, kind: 'public-rule-grant',
-        findingIds: findings.map(value => value.id), evidence, confidence: 'confirmed' },
+        findingIds, evidence, confidence: 'confirmed' },
       { id: `${findings[0].id}:data`, from: resource, to: data, kind: read ? 'read-data' : 'write-data',
-        findingIds: findings.map(value => value.id), evidence, confidence: 'confirmed' });
+        findingIds, evidence, confidence: 'confirmed' });
     }
-    if (kind === 'firestore' && operations.some(value => ['write', 'create', 'update'].includes(value)) &&
+    if (kind === 'firestore' && writeCreateUpdate &&
       /request\.auth/.test(condition) && /\/(?:users|profiles|accounts|members)(?:\/|$)/i.test(path) &&
       !/\.hasOnly\s*\(/.test(condition)) {
       const finding = addFinding(graph, file, line, 'firebase/privilege-fields', 'medium',

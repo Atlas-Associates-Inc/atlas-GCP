@@ -15,13 +15,13 @@
 | **CLI & SARIF/Diff Reporter** | `src/cli.ts`, `src/report/**` | Single-command developer UX (`atlas-shield audit <dir>`, `atlas-shield airlock [--profile <name>]`, `atlas-shield mcp-config`, `atlas-shield sanitize`) outputting human-readable tables, GitHub Code Scanning SARIF v2.1.0, Airlock MCP configs, and minimal remediation diffs. | Never mutates cloud state or local user repositories; outputs proposed configs and diffs to `stdout` only. |
 
 ## 3. Hard Engineering & Supply-Chain Invariants
-1. **Zero Runtime npm Supply-Chain Surface**: Built on **Node.js `>=22.18.0` native erasable TypeScript (`.ts`)** using exclusively Node built-in modules (`node:fs`, `node:path`, `node:crypto`, `node:child_process`, `node:util`, `node:readline`, `node:test`). `package.json` MUST keep `"dependencies": {}`.
+1. **Zero Runtime npm Supply-Chain Surface**: Built on **Node.js `>=22.18.0` native erasable TypeScript (`.ts`)** using exclusively Node built-in modules (`node:fs`, `node:path`, `node:module`, `node:crypto`, `node:child_process`, `node:util`, `node:readline`, `node:test`). `package.json` MUST keep `"dependencies": {}`.
 2. **Mechanical Write Prohibition**: Atlas Shield MUST NEVER execute mutating cloud commands (`firebase deploy`, `gcloud ... update/delete/deploy/set-iam-policy`) or forward mutating MCP tool calls (`deploy`, `create`, `update`, `delete`, `set`, `init`, `evaluate`).
 3. **Untrusted Telemetry Isolation**: All cloud log entries, resource labels, and third-party MCP responses MUST pass through deterministic secret redaction and prompt-injection boundary sanitization before entering any model prompt.
 4. **Model & Repository Governance (Zero-Claude Policy)**:
    - Canonical repository root: `/Users/takayukimiyano/StudioProjects/GCP`
    - Planning & Frozen Implementation Orders live in `/Users/takayukimiyano/StudioProjects/GCP/TASK_PLAN.md`.
-   - **Claude / Anthropic models are strictly excluded** from both development governance and runtime prover adapters.
-   - **Through 2026-11-08**: **Astra Ultra (`gpt-6-astra`, `effort=ultra`)** executes holistic cross-layer implementation (`atlas-implement`), and **Argon High (`gemini-4-argon-high`)** conducts architecture orchestration and orthogonal post-implementation audit.
-   - **From 2026-11-09 onward**: Pure **Gemini (`gemini-4-argon-high` / Vertex AI)** sovereign development and runtime operation.
+   - **Claude / Anthropic and non-approved lightweight models are abolished and prohibited** across development governance and runtime prover adapters.
+   - **Through 2026-11-08 JST**: **Astra xhigh (`gpt-6-astra`, `effort=xhigh`)**, **Argon High (`gemini-4-argon-high`)**, and **Gemini 3.8 Flash High (`gemini-3.8-flash-high`)** operate under orthogonal Two-Epoch development governance (`Argon High` conducts orchestration and Google clean-room audit; `Astra xhigh` executes cross-layer implementation and OpenAI clean-room audit; `Gemini 3.8 Flash High` supports rapid iteration and parallel research).
+   - **From 2026-11-09 JST onward**: Pure **Gemini (`gemini-4-argon-high` and `gemini-3.8-flash-high` / Vertex AI)** sovereign development and clean-room `Argon High` audit.
    - `git commit`, `git push`, `gh pr`, `npm publish`, and cloud deployments require explicit Go from `taka-san`.

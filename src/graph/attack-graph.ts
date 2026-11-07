@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { hash as cryptoHash } from 'node:crypto';
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { AttackPath, GraphEdge, GraphNode, GraphResult, Severity } from '../types.ts';
@@ -21,23 +21,108 @@ export const EXCLUDED_DIRS: ReadonlySet<string> = new Set([
 const rank: Record<Severity, number> = { blocker: 0, high: 1, medium: 2, low: 3, info: 4 };
 const compare = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
 const unique = (values: string[]): string[] => [...new Set(values)].sort();
-const hash = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 20);
+const hash = (value: unknown): string => cryptoHash('sha256', JSON.stringify(value), 'hex').slice(0, 20);
 
-function byId<T extends { id: string }>(items: T[]): T[] {
-  const map = new Map<string, T>();
-  for (const item of items) {
-    const previous = map.get(item.id);
-    if (!previous) map.set(item.id, item);
-    else if (previous !== item && compare(JSON.stringify(item), JSON.stringify(previous)) > 0) map.set(item.id, item);
+const HEX_NIBBLE = new Int8Array(128).fill(-1);
+for (let c = 48; c <= 57; c++) HEX_NIBBLE[c] = c - 48;
+for (let c = 97; c <= 102; c++) HEX_NIBBLE[c] = c - 97 + 10;
+
+function sortByHexPrefix<T>(items: readonly T[], getId: (item: T) => string): T[] {
+  const len = items.length;
+  if (len < 512) {
+    return items.slice().sort((a, b) => compare(getId(a), getId(b)));
   }
-  return [...map.keys()].sort().map(id => map.get(id)!);
+  const counts = new Uint32Array(65536);
+  const buckets = new Uint16Array(len);
+  for (let i = 0; i < len; i++) {
+    const id = getId(items[i]);
+    if (id.length < 4) {
+      return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+    }
+    const c0 = id.charCodeAt(0);
+    const c1 = id.charCodeAt(1);
+    const c2 = id.charCodeAt(2);
+    const c3 = id.charCodeAt(3);
+    if (c0 >= 128 || c1 >= 128 || c2 >= 128 || c3 >= 128) {
+      return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+    }
+    const d0 = HEX_NIBBLE[c0];
+    const d1 = HEX_NIBBLE[c1];
+    const d2 = HEX_NIBBLE[c2];
+    const d3 = HEX_NIBBLE[c3];
+    if (d0 < 0 || d1 < 0 || d2 < 0 || d3 < 0) {
+      return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+    }
+    const bucket = (d0 << 12) | (d1 << 8) | (d2 << 4) | d3;
+    buckets[i] = bucket;
+    counts[bucket]++;
+  }
+  let maxBucket = 0;
+  let sum = 0;
+  for (let b = 0; b < 65536; b++) {
+    const c = counts[b];
+    if (c > maxBucket) maxBucket = c;
+    counts[b] = sum;
+    sum += c;
+  }
+  if (maxBucket > 64) {
+    return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+  }
+  const out = new Array<T>(len);
+  for (let i = 0; i < len; i++) {
+    out[counts[buckets[i]]++] = items[i];
+  }
+  for (let i = 1; i < len; i++) {
+    const cur = out[i];
+    const curId = getId(cur);
+    let j = i - 1;
+    while (j >= 0 && getId(out[j]) > curId) {
+      out[j + 1] = out[j];
+      j--;
+    }
+    out[j + 1] = cur;
+  }
+  return out;
+}
+
+function byId<T extends { id: string }>(items: readonly T[]): T[] {
+  if (items.length === 0) return [];
+  const sorted = sortByHexPrefix(items, item => item.id);
+  const result: T[] = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const item = sorted[i];
+    const previous = result[result.length - 1];
+    if (item.id === previous.id) {
+      if (item !== previous && compare(JSON.stringify(item), JSON.stringify(previous)) > 0) {
+        result[result.length - 1] = item;
+      }
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+function uniqueSortedStrings(values: readonly string[]): string[] {
+  if (values.length === 0) return [];
+  const sorted = sortByHexPrefix(values, s => s);
+  const result: string[] = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const cur = sorted[i];
+    if (cur !== result[result.length - 1]) {
+      result.push(cur);
+    }
+  }
+  return result;
 }
 
 /** Merge without modifying parser results; output order is independent of traversal order. */
 export function mergeGraphs(graphs: readonly GraphResult[]): GraphResult {
   const result = emptyGraph();
   const nodes = new Map<string, { node: GraphNode; serialized: string }>();
-  const edges = new Map<string, { edge: GraphEdge; findingIds: Set<string> }>();
+  type EdgeAccumulator = { raw: GraphEdge; edge: GraphEdge; findingIds: string[] };
+  const edges = new Map<string, EdgeAccumulator>();
+  let mru0: EdgeAccumulator | undefined, mru1: EdgeAccumulator | undefined;
   for (const graph of graphs) {
     for (const node of graph.nodes) {
       const previous = nodes.get(node.id);
@@ -52,34 +137,113 @@ export function mergeGraphs(graphs: readonly GraphResult[]): GraphResult {
       }
     }
     for (const edge of graph.edges) {
-      const key = `${edge.from.length}:${edge.from}|${edge.to.length}:${edge.to}|${edge.kind.length}:${edge.kind}|${edge.confidence.length}:${edge.confidence}|${edge.evidence}`;
-      let entry = edges.get(key);
-      if (!entry) {
-        entry = { edge: { ...edge }, findingIds: new Set<string>() };
-        edges.set(key, entry);
-      } else if (compare(edge.id, entry.edge.id) < 0) entry.edge.id = edge.id;
-      for (const id of edge.findingIds) entry.findingIds.add(id);
+      let entry: EdgeAccumulator | undefined;
+      if (mru0 && mru0.raw.from === edge.from && mru0.raw.to === edge.to && mru0.raw.kind === edge.kind &&
+        mru0.raw.confidence === edge.confidence && mru0.raw.evidence === edge.evidence) {
+        entry = mru0;
+      } else if (mru1 && mru1.raw.from === edge.from && mru1.raw.to === edge.to && mru1.raw.kind === edge.kind &&
+        mru1.raw.confidence === edge.confidence && mru1.raw.evidence === edge.evidence) {
+        entry = mru1;
+        mru1 = mru0;
+        mru0 = entry;
+      } else {
+        const key = `${edge.from.length}:${edge.from}|${edge.to.length}:${edge.to}|${edge.kind.length}:${edge.kind}|${edge.confidence.length}:${edge.confidence}|${edge.evidence}`;
+        entry = edges.get(key);
+        if (!entry) {
+          entry = { raw: edge, edge: { ...edge }, findingIds: [] };
+          edges.set(key, entry);
+        }
+        mru1 = mru0;
+        mru0 = entry;
+      }
+      if (compare(edge.id, entry.edge.id) < 0) entry.edge.id = edge.id;
+      for (const id of edge.findingIds) entry.findingIds.push(id);
     }
   }
   result.nodes = [...nodes.values()].map(entry => entry.node).sort((a, b) => compare(a.id, b.id));
-  result.findings = byId(graphs.flatMap(graph => graph.findings));
-  const orderedFindingIds = result.findings.map(finding => finding.id);
-  result.edges = [...edges.values()].map(entry => ({ ...entry.edge,
-    // Dense grants can share the complete finding set; reuse its ordering only
-    // after checking membership, since edges may also reference unknown IDs.
-    findingIds: entry.findingIds.size === orderedFindingIds.length && orderedFindingIds.every(id => entry.findingIds.has(id))
-      ? orderedFindingIds.slice() : [...entry.findingIds].sort() }))
-    .sort((a, b) => compare(a.id, b.id));
+  const nonEmptyFindings = graphs.filter(g => g.findings.length > 0);
+  result.findings = nonEmptyFindings.length === 1
+    ? byId(nonEmptyFindings[0].findings)
+    : byId(graphs.flatMap(graph => graph.findings));
+  let lastRawIds: readonly string[] | undefined;
+  let lastSortedIds: readonly string[] | undefined;
+  const processedEdges: GraphEdge[] = [];
+  for (const entry of edges.values()) {
+    let findingIds: string[];
+    if (lastRawIds && lastSortedIds && lastRawIds.length === entry.findingIds.length &&
+      lastRawIds.every((id, k) => id === entry.findingIds[k])) {
+      findingIds = lastSortedIds.slice();
+    } else {
+      findingIds = uniqueSortedStrings(entry.findingIds);
+      lastRawIds = entry.findingIds;
+      lastSortedIds = findingIds;
+    }
+    processedEdges.push({ ...entry.edge, findingIds });
+  }
+  result.edges = processedEdges.sort((a, b) => compare(a.id, b.id));
   result.paths = byId(graphs.flatMap(graph => graph.paths));
   result.limitations = unique(graphs.flatMap(graph => graph.limitations));
   return result;
 }
 
+function isStrictlySorted(ids: readonly string[]): boolean {
+  for (let i = 1; i < ids.length; i++) {
+    if (!(ids[i - 1] < ids[i])) return false;
+  }
+  return true;
+}
+
+function mergeTwoSortedUnique(a: readonly string[], b: readonly string[]): readonly string[] {
+  if (a.length === b.length && a.every((val, i) => val === b[i])) return a;
+  const merged: string[] = [];
+  let i = 0, j = 0;
+  while (i < a.length && j < b.length) {
+    const va = a[i], vb = b[j];
+    if (va === vb) {
+      merged.push(va);
+      i++;
+      j++;
+    } else if (va < vb) {
+      merged.push(va);
+      i++;
+    } else {
+      merged.push(vb);
+      j++;
+    }
+  }
+  while (i < a.length) merged.push(a[i++]);
+  while (j < b.length) merged.push(b[j++]);
+  return merged;
+}
+
 /** Enumerate simple paths, including transitive impersonation; cycles never recurse. */
 export function findAttackPaths(graph: GraphResult): AttackPath[] {
   const nodes = new Map(graph.nodes.map(node => [node.id, node]));
-  const findings = new Map<string, GraphResult['findings'][number]>();
-  for (const finding of graph.findings) findings.set(finding.id, finding);
+  let hasEscalationFindings = false;
+  let minGraphRank = Infinity;
+  let findingsSorted = true;
+  for (let i = 0; i < graph.findings.length; i++) {
+    const finding = graph.findings[i];
+    if (i > 0 && !(graph.findings[i - 1].id < finding.id)) findingsSorted = false;
+    if (finding.ruleId === 'iam/privilege-escalation') hasEscalationFindings = true;
+    const r = rank[finding.severity];
+    if (r < minGraphRank) minGraphRank = r;
+  }
+  const fallbackMap = findingsSorted ? undefined : new Map<string, GraphResult['findings'][number]>(
+    graph.findings.map(finding => [finding.id, finding])
+  );
+  const getFinding = (id: string): GraphResult['findings'][number] | undefined => {
+    if (fallbackMap) return fallbackMap.get(id);
+    let low = 0, high = graph.findings.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >>> 1;
+      const midFinding = graph.findings[mid];
+      if (midFinding.id === id) return midFinding;
+      if (midFinding.id < id) low = mid + 1;
+      else high = mid - 1;
+    }
+    return undefined;
+  };
   const outgoing = new Map<string, GraphEdge[]>();
   for (const edge of graph.edges) {
     if (!nodes.has(edge.from) || !nodes.has(edge.to)) continue;
@@ -94,27 +258,24 @@ export function findAttackPaths(graph: GraphResult): AttackPath[] {
     const current = ids.at(-1)!;
     const last = links.at(-1);
     const terminal = nodes.get(current)!.kind === 'data' || last?.kind === 'service-account-impersonation' ||
-      last?.findingIds.some(id => findings.get(id)?.ruleId === 'iam/privilege-escalation');
+      (hasEscalationFindings && last?.findingIds.some(id => getFinding(id)?.ruleId === 'iam/privilege-escalation'));
     if (last && terminal) {
       if (paths.length >= 1000) { limited = true; return; }
-      let orderedSingleEdge = links.length === 1;
-      if (orderedSingleEdge) {
-        for (let i = 1; i < links[0].findingIds.length; i++) {
-          if (!(links[0].findingIds[i - 1] < links[0].findingIds[i])) { orderedSingleEdge = false; break; }
-        }
-      }
       let findingIds: string[];
-      if (orderedSingleEdge) findingIds = links[0].findingIds.slice();
-      else {
+      if (links.every(edge => isStrictlySorted(edge.findingIds))) {
+        let merged: readonly string[] = links[0].findingIds;
+        for (let i = 1; i < links.length; i++) merged = mergeTwoSortedUnique(merged, links[i].findingIds);
+        findingIds = merged.slice();
+      } else {
         const linkedFindingIds = new Set<string>();
         for (const edge of links) for (const id of edge.findingIds) linkedFindingIds.add(id);
         findingIds = [...linkedFindingIds].sort();
       }
       let severity: Severity | undefined;
       for (const id of findingIds) {
-        const candidate = findings.get(id)?.severity;
+        const candidate = getFinding(id)?.severity;
         if (candidate && (severity === undefined || rank[candidate] < rank[severity])) severity = candidate;
-        if (severity === 'blocker') break;
+        if (severity !== undefined && rank[severity] <= minGraphRank) break;
       }
       paths.push({ id: hash(links.map(edge => edge.id)), nodes: [...ids], edges: links.map(edge => edge.id), findingIds,
         severity: severity ?? 'medium',

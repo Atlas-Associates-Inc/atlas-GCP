@@ -1,13 +1,29 @@
 import { hash } from 'node:crypto';
-import type { Finding, GraphNode, GraphResult, Severity } from '../types.ts';
+import type { Finding, GraphEdge, GraphNode, GraphResult, Severity } from '../types.ts';
 
 export function emptyGraph(): GraphResult {
   return { nodes: [], edges: [], findings: [], paths: [], limitations: [] };
 }
 
+let lastHashFile: string | undefined;
+let lastHashLine: number | undefined;
+let lastHashRuleId: string | undefined;
+let lastHashEvidence: string | undefined;
+let lastHashId: string | undefined;
+
 export function addFinding(graph: GraphResult, file: string, line: number, ruleId: string,
   severity: Severity, title: string, message: string, evidence: string): Finding {
-  const id = hash('sha256', `${file}\0${line}\0${ruleId}\0${evidence}`, 'hex').slice(0, 20);
+  let id: string;
+  if (file === lastHashFile && line === lastHashLine && ruleId === lastHashRuleId && evidence === lastHashEvidence && lastHashId !== undefined) {
+    id = lastHashId;
+  } else {
+    id = hash('sha256', `${file}\0${line}\0${ruleId}\0${evidence}`, 'hex').slice(0, 20);
+    lastHashFile = file;
+    lastHashLine = line;
+    lastHashRuleId = ruleId;
+    lastHashEvidence = evidence;
+    lastHashId = id;
+  }
   const finding = { id, ruleId, severity, title, message, location: { file, line }, evidence };
   graph.findings.push(finding);
   return finding;
@@ -79,13 +95,21 @@ function maskComments(source: string, hashComments: boolean, allowSingleQuotes: 
 export function createLineIndex(source: string): (offset: number) => number {
   const newlines: number[] = [];
   for (let i = 0; i < source.length; i++) if (source[i] === '\n') newlines.push(i);
+  let lastOffset = 0, lastIndex = 0;
   return (offset) => {
+    if (offset >= lastOffset) {
+      while (lastIndex < newlines.length && newlines[lastIndex] < offset) lastIndex++;
+      lastOffset = offset;
+      return lastIndex + 1;
+    }
     let low = 0, high = newlines.length;
     while (low < high) {
       const middle = low + Math.floor((high - low) / 2);
       if (newlines[middle] < offset) low = middle + 1;
       else high = middle;
     }
+    lastOffset = offset;
+    lastIndex = low;
     return low + 1;
   };
 }
@@ -129,107 +153,244 @@ export function closingBrace(source: string, open: number, allowSingleQuotes = t
   return -1;
 }
 
+function isSpaceCode(code: number): boolean {
+  return code === 32 || (code >= 9 && code <= 13) || (code >= 160 && /\s/.test(String.fromCharCode(code)));
+}
+
+function isLowerAlphaCode(code: number): boolean {
+  return code >= 97 && code <= 122;
+}
+
+function isWordCode(code: number): boolean {
+  return (code >= 97 && code <= 122) || (code >= 65 && code <= 90) || (code >= 48 && code <= 57) || code === 95;
+}
+
+function isWordOrDotCode(code: number): boolean {
+  return isWordCode(code) || code === 46;
+}
+
+function isOperatorResetCode(code: number): boolean {
+  return code === 61 || code === 58 || code === 63 || code === 33 || code === 38 ||
+    code === 124 || code === 60 || code === 62 || code === 43 || code === 42 || code === 37;
+}
+
+function isPathOrMemberDelimiter(code: number): boolean {
+  return isWordOrDotCode(code) || code === 47 || code === 45;
+}
+
+function isHeaderKeywordAt(text: string, cursor: number): boolean {
+  const code = text.charCodeAt(cursor);
+  if (code !== 109 && code !== 102 && code !== 115) return false;
+  if (isPathOrMemberDelimiter(text.charCodeAt(cursor - 1))) return false;
+  const end = code === 109
+    ? (text.startsWith('match', cursor) ? cursor + 5 : -1)
+    : code === 102
+      ? (text.startsWith('function', cursor) ? cursor + 8 : -1)
+      : (text.startsWith('service', cursor) ? cursor + 7 : -1);
+  if (end < 0) return false;
+  const next = text.charCodeAt(end);
+  return !isWordOrDotCode(next) && next !== 45;
+}
+
+function isCelInOperatorAt(text: string, cursor: number): boolean {
+  return text.charCodeAt(cursor) === 105 &&
+    text.charCodeAt(cursor + 1) === 110 &&
+    !isPathOrMemberDelimiter(text.charCodeAt(cursor - 1)) &&
+    !isPathOrMemberDelimiter(text.charCodeAt(cursor + 2));
+}
+
 function parseAllowHeader(text: string, start: number, end: number):
   { operations: string[]; condition: string } | undefined {
   const operations: string[] = [];
   let cursor = start + 'allow'.length;
   for (;;) {
-    while (cursor < end && /\s/.test(text[cursor])) cursor++;
+    while (cursor < end && isSpaceCode(text.charCodeAt(cursor))) cursor++;
     const operationStart = cursor;
-    while (cursor < end && /[a-z]/.test(text[cursor])) cursor++;
+    while (cursor < end && isLowerAlphaCode(text.charCodeAt(cursor))) cursor++;
     if (cursor === operationStart) return undefined;
     operations.push(text.slice(operationStart, cursor));
-    while (cursor < end && /\s/.test(text[cursor])) cursor++;
-    if (text[cursor] !== ',') break;
+    while (cursor < end && isSpaceCode(text.charCodeAt(cursor))) cursor++;
+    if (cursor >= end || text.charCodeAt(cursor) !== 44) break;
     cursor++;
   }
   if (cursor === end) return { operations, condition: 'true' };
-  if (text[cursor++] !== ':') return undefined;
-  while (cursor < end && /\s/.test(text[cursor])) cursor++;
-  if (!text.startsWith('if', cursor) || /[A-Za-z0-9_]/.test(text[cursor + 2] ?? '')) return undefined;
+  if (text.charCodeAt(cursor++) !== 58) return undefined;
+  while (cursor < end && isSpaceCode(text.charCodeAt(cursor))) cursor++;
+  if (!text.startsWith('if', cursor) || isWordCode(text.charCodeAt(cursor + 2))) return undefined;
   cursor += 2;
-  while (cursor < end && /\s/.test(text[cursor])) cursor++;
+  while (cursor < end && isSpaceCode(text.charCodeAt(cursor))) cursor++;
   const condition = text.slice(cursor, end).trim();
   return condition ? { operations, condition } : undefined;
+}
+
+function forEachAllowClause(text: string, emit: (offset: number, operations: string[], condition: string, evidence: string) => void): void {
+  let start = -1, quote = 0, escaped = false, parens = 0, boundary = true;
+  let afterColon = false, braces = 0, headerKeyword = false;
+  for (let cursor = 0; cursor < text.length; cursor++) {
+    const code = text.charCodeAt(cursor);
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (code === 92) escaped = true;
+      else if (code === quote) quote = 0;
+      continue;
+    }
+    if (code === 34 || code === 39) { quote = code; boundary = false; continue; }
+    if (code === 40) parens++;
+    else if (code === 41) parens = Math.max(0, parens - 1);
+    if (start >= 0 && !afterColon && parens === 0 && code === 58) {
+      afterColon = true;
+      headerKeyword = false;
+    }
+    if (afterColon && parens === 0 && code === 123) {
+      // A missing semicolon must not turn the next rules block into a CEL map.
+      if (braces > 0 || !headerKeyword) { braces++; boundary = false; continue; }
+    }
+    if (afterColon && parens === 0 && code === 125 && braces > 0) {
+      if (--braces === 0) headerKeyword = false;
+      continue;
+    }
+    if (parens === 0 && (code === 123 || code === 125)) {
+      start = -1;
+      afterColon = false;
+      braces = 0;
+      headerKeyword = false;
+      boundary = true;
+    } else if (parens === 0 && braces === 0 && code === 59) {
+      const offset = start;
+      start = -1;
+      afterColon = false;
+      braces = 0;
+      headerKeyword = false;
+      boundary = true;
+      const clause = offset >= 0 ? parseAllowHeader(text, offset, cursor) : undefined;
+      if (clause) emit(offset, clause.operations, clause.condition, text.slice(offset, cursor + 1).trim());
+    } else if (boundary && start < 0 && text.startsWith('allow', cursor) && !isWordOrDotCode(text.charCodeAt(cursor - 1)) &&
+      isSpaceCode(text.charCodeAt(cursor + 5))) {
+      start = cursor;
+      boundary = false;
+    } else {
+      // Relational/logical/list delimiters separate CEL map operands; '/' and '-' can be match path syntax.
+      if (afterColon && parens === 0 && braces === 0) {
+        if (isHeaderKeywordAt(text, cursor)) headerKeyword = true;
+        else if (isOperatorResetCode(code) || code === 44 || code === 91 || isCelInOperatorAt(text, cursor)) headerKeyword = false;
+      } else if (afterColon && parens > 0 && (code === 123 || code === 59)) {
+        headerKeyword = false;
+      }
+      if (!isSpaceCode(code)) boundary = false;
+    }
+  }
 }
 
 /** Consume each candidate once, including unterminated clauses and quoted semicolons. */
 export function* scanAllowClauses(text: string): Generator<{
   offset: number; operations: string[]; condition: string; evidence: string;
 }> {
-  let start = -1, quote = '', escaped = false, parens = 0, boundary = true;
-  let afterColon = false, braces = 0, colonOffset = 0;
-  for (let cursor = 0; cursor < text.length; cursor++) {
-    const character = text[cursor];
-    if (quote) {
-      if (escaped) escaped = false;
-      else if (character === '\\') escaped = true;
-      else if (character === quote) quote = '';
-      continue;
-    }
-    if (character === '"' || character === "'") { quote = character; boundary = false; continue; }
-    if (character === '(') parens++;
-    else if (character === ')') parens = Math.max(0, parens - 1);
-    if (start >= 0 && !afterColon && parens === 0 && character === ':') {
-      afterColon = true;
-      colonOffset = cursor + 1;
-    }
-    if (afterColon && parens === 0 && character === '{') {
-      // A missing semicolon must not turn the next rules block into a CEL map.
-      const header = braces === 0 && /\b(?:match|function|service)\b[^{;]*$/.test(
-        text.slice(colonOffset, cursor).replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, ' '));
-      if (!header) { braces++; boundary = false; continue; }
-    }
-    if (afterColon && parens === 0 && character === '}' && braces > 0) {
-      if (--braces === 0) colonOffset = cursor + 1;
-      continue;
-    }
-    if (parens === 0 && (character === '{' || character === '}')) {
-      start = -1;
-      afterColon = false;
-      braces = 0;
-      boundary = true;
-    } else if (parens === 0 && braces === 0 && character === ';') {
-      const offset = start;
-      start = -1;
-      afterColon = false;
-      braces = 0;
-      boundary = true;
-      const clause = offset >= 0 ? parseAllowHeader(text, offset, cursor) : undefined;
-      if (clause) yield { offset, ...clause, evidence: text.slice(offset, cursor + 1).trim() };
-    } else if (boundary && start < 0 && text.startsWith('allow', cursor) && !/[A-Za-z0-9_.]/.test(text[cursor - 1] ?? '') &&
-      /\s/.test(text[cursor + 5] ?? '')) {
-      start = cursor;
-      boundary = false;
-    } else {
-      // Relational/logical operators delimit map operands; '/' and '-' can be match path syntax.
-      if (afterColon && parens === 0 && braces === 0 && (/[=:?!&|<>+*%]/.test(character)
-        || (text.startsWith('in', cursor) && !/[A-Za-z0-9_]/.test(text[cursor - 1] ?? '')
-          && !/[A-Za-z0-9_]/.test(text[cursor + 2] ?? '')))) colonOffset = cursor + 1;
-      if (!/\s/.test(character)) boundary = false;
-    }
+  const clauses: Array<{ offset: number; operations: string[]; condition: string; evidence: string }> = [];
+  forEachAllowClause(text, (offset, operations, condition, evidence) => {
+    clauses.push({ offset, operations, condition, evidence });
+  });
+  for (const clause of clauses) {
+    yield clause;
   }
 }
 
+interface FirebaseScope {
+  path: string;
+  start: number;
+  end: number;
+  recursive: boolean;
+  limited: boolean;
+  data: string;
+  resource: string;
+  resourceLabel?: string;
+  dataLabel?: string;
+  resourceNode?: GraphNode;
+  resourceLineLex?: string;
+  readTitle?: string;
+  readMessage?: string;
+  writeTitle?: string;
+  writeMessage?: string;
+  wildcardMessage?: string;
+  privFieldsLabel?: string;
+}
+
 export function parseFirebaseRules(source: string, file: string,
-  kind: 'firestore' | 'storage' = file.includes('storage') ? 'storage' : 'firestore'): GraphResult {
+  kind: 'firestore' | 'storage' = file.includes('storage') ? 'storage' : 'firestore',
+  collapseDuplicateEdges = false): GraphResult {
   const graph = emptyGraph(), text = stripComments(source);
-  const nodes = new Map<string, GraphNode>();
-  const addNode = (id: string, kind: GraphNode['kind'], label: string, line?: number): void => {
+  const nodeList: GraphNode[] = [];
+  const nodes = new Map<string, { node: GraphNode; index: number; lineLex?: string }>();
+  type EdgeAccumulator = { edge: GraphEdge; rawFrom: string; rawTo: string; rawKind: string; rawConfidence: string; rawEvidence: string };
+  const edgeMap = collapseDuplicateEdges ? new Map<string, EdgeAccumulator>() : undefined;
+  let mru0: EdgeAccumulator | undefined;
+  let mru1: EdgeAccumulator | undefined;
+
+  const accumulateEdge = (
+    edgeId: string,
+    from: string,
+    to: string,
+    edgeKind: GraphEdge['kind'],
+    confidence: GraphEdge['confidence'],
+    evidence: string,
+    f1?: Finding,
+    f2?: Finding,
+    f3?: Finding,
+  ): void => {
+    let entry: EdgeAccumulator | undefined;
+    if (mru0 && mru0.rawFrom === from && mru0.rawTo === to && mru0.rawKind === edgeKind &&
+      mru0.rawConfidence === confidence && mru0.rawEvidence === evidence) {
+      entry = mru0;
+    } else if (mru1 && mru1.rawFrom === from && mru1.rawTo === to && mru1.rawKind === edgeKind &&
+      mru1.rawConfidence === confidence && mru1.rawEvidence === evidence) {
+      entry = mru1;
+      mru1 = mru0;
+      mru0 = entry;
+    } else {
+      const key = `${from.length}:${from}|${to.length}:${to}|${edgeKind.length}:${edgeKind}|${confidence.length}:${confidence}|${evidence}`;
+      entry = edgeMap!.get(key);
+      if (!entry) {
+        entry = {
+          edge: { id: edgeId, from, to, kind: edgeKind, confidence, evidence, findingIds: [] },
+          rawFrom: from, rawTo: to, rawKind: edgeKind, rawConfidence: confidence, rawEvidence: evidence,
+        };
+        edgeMap!.set(key, entry);
+      }
+      mru1 = mru0;
+      mru0 = entry;
+    }
+    if (edgeId < entry.edge.id) entry.edge.id = edgeId;
+    if (f1) entry.edge.findingIds.push(f1.id);
+    if (f2) entry.edge.findingIds.push(f2.id);
+    if (f3) entry.edge.findingIds.push(f3.id);
+  };
+  const addNode = (id: string, nodeKind: GraphNode['kind'], label: string, line?: number): void => {
     const previous = nodes.get(id);
-    if (previous && previous.label === label) {
+    if (previous && previous.node.label === label) {
       // Matching parser nodes differ only in line; include the JSON closing brace
       // to preserve mergeGraphs' lexical tie-break (e.g. line 10 precedes line 2).
-      if (line !== undefined && previous.location && `${line}}` < `${previous.location.line}}`) previous.location.line = line;
+      if (line !== undefined && previous.node.location) {
+        const lex = `${line}}`;
+        if (lex < (previous.lineLex ??= `${previous.node.location.line}}`)) {
+          previous.node.location.line = line;
+          previous.lineLex = lex;
+        }
+      }
       return;
     }
-    const node: GraphNode = { id, kind, label, ...(line === undefined ? {} : { location: { file, line } }) };
-    if (!previous || JSON.stringify(node) < JSON.stringify(previous)) nodes.set(id, node);
+    const node: GraphNode = { id, kind: nodeKind, label, ...(line === undefined ? {} : { location: { file, line } }) };
+    if (!previous) {
+      const index = nodeList.length;
+      nodeList.push(node);
+      nodes.set(id, { node, index, lineLex: line === undefined ? undefined : `${line}}` });
+    } else if (JSON.stringify(node) < JSON.stringify(previous.node)) {
+      nodeList[previous.index] = node;
+      previous.node = node;
+      previous.lineLex = line === undefined ? undefined : `${line}}`;
+    }
   };
   const lineIndex = createLineIndex(text), bracePairs = buildBraceMap(text);
-  const scopes: Array<{ path: string; start: number; end: number; recursive: boolean; limited: boolean;
-    data: string; resource: string; resourceLabel: string; dataLabel: string }> = [];
-  const active: typeof scopes = [];
+  const scopes: FirebaseScope[] = [];
+  const active: FirebaseScope[] = [];
   let traversalLimited = false;
   // Keep segments separate so a wildcard's opening brace cannot become the block brace.
   for (const match of text.matchAll(/\bmatch\s+((?:\/(?:[^/{}\s]|\{[^/{}\s]+\})+)+)\s*\{/g)) {
@@ -240,8 +401,8 @@ export function parseFirebaseRules(source: string, file: string,
         'Unbalanced Firebase rules', 'The rules could not be completely parsed.', 'Unclosed match block');
       continue;
     }
-    while (active.length && active.at(-1)!.end <= start) active.pop();
-    const parent = active.at(-1);
+    while (active.length && active[active.length - 1].end <= start) active.pop();
+    const parent = active[active.length - 1];
     if (parent?.limited) continue;
     const limited = active.length >= 64 || (parent?.path.length ?? 0) + match[1].length > 4096;
     if (limited && !traversalLimited) {
@@ -252,8 +413,7 @@ export function parseFirebaseRules(source: string, file: string,
     }
     // A bounded sentinel also suppresses allow clauses inside the skipped subtree.
     const path = limited ? '' : (parent?.path ?? '') + match[1];
-    const scope = { start, end, limited, path, data: `data:${kind}:${file}:${path}`, resource: `rules:${file}:${start}`,
-      resourceLabel: `${kind} rules ${path}`, dataLabel: `${kind} data matching ${path}`,
+    const scope: FirebaseScope = { start, end, limited, path, data: `data:${kind}:${file}:${path}`, resource: `rules:${file}:${start}`,
       recursive: (parent?.recursive ?? false) || /\{[^}]+=\*\*\}/.test(match[1]) };
     active.push(scope);
     scopes.push(scope);
@@ -266,17 +426,16 @@ export function parseFirebaseRules(source: string, file: string,
   // matchAll already emits scopes in source order.
   active.length = 0;
   let nextScope = 0;
-  for (const allow of scanAllowClauses(text)) {
-    const { offset, operations, condition, evidence } = allow;
+  forEachAllowClause(text, (offset, operations, condition, evidence) => {
     const line = lineIndex(offset);
-    while (active.length && active.at(-1)!.end <= offset) active.pop();
+    while (active.length && active[active.length - 1].end <= offset) active.pop();
     while (nextScope < scopes.length && scopes[nextScope].start < offset) {
       const scope = scopes[nextScope++];
       if (scope.end > offset) active.push(scope);
     }
-    if (!active.length || active.at(-1)!.limited) continue;
-    const scope = active.at(-1)!;
-    const { path, data, resource, resourceLabel, dataLabel } = scope;
+    if (!active.length || active[active.length - 1].limited) return;
+    const scope = active[active.length - 1];
+    const { path, data, resource } = scope;
     let read = false, write = false, writeCreateUpdate = false;
     for (const op of operations) {
       if (op === 'read' || op === 'get' || op === 'list') read = true;
@@ -285,22 +444,62 @@ export function parseFirebaseRules(source: string, file: string,
     }
     const publicAccess = condition === 'true' || /^\(*\s*true\s*\)*$/.test(condition);
     if (publicAccess && (read || write)) {
-      const findings: Finding[] = [];
-      for (const access of [read ? 'read' : '', write ? 'write' : ''].filter(Boolean)) {
-        findings.push(addFinding(graph, file, line, `firebase/public-${access}`, 'high',
-          `Public ${kind} ${access}`, `The unconditional grant permits unauthenticated ${access} at ${path}.`, evidence));
+      let readFinding: Finding | undefined;
+      let writeFinding: Finding | undefined;
+      let wildcardFinding: Finding | undefined;
+      if (read) {
+        const title = scope.readTitle ??= `Public ${kind} read`;
+        const message = scope.readMessage ??= `The unconditional grant permits unauthenticated read at ${path}.`;
+        readFinding = addFinding(graph, file, line, 'firebase/public-read', 'high', title, message, evidence);
       }
-      if (read && scope.recursive) findings.push(addFinding(graph, file, line,
-        'firebase/recursive-wildcard', 'high', 'Recursive wildcard exposes descendants',
-        `The public read grant covers the recursive match ${path}.`, evidence));
+      if (write) {
+        const title = scope.writeTitle ??= `Public ${kind} write`;
+        const message = scope.writeMessage ??= `The unconditional grant permits unauthenticated write at ${path}.`;
+        writeFinding = addFinding(graph, file, line, 'firebase/public-write', 'high', title, message, evidence);
+      }
+      if (read && scope.recursive) {
+        const message = scope.wildcardMessage ??= `The public read grant covers the recursive match ${path}.`;
+        wildcardFinding = addFinding(graph, file, line, 'firebase/recursive-wildcard', 'high',
+          'Recursive wildcard exposes descendants', message, evidence);
+      }
       addNode(entry, 'entry', 'Unauthenticated Firebase client');
-      addNode(resource, 'resource', resourceLabel, line);
+      if (!scope.resourceNode) {
+        const resourceLabel = scope.resourceLabel ??= `${kind} rules ${path}`;
+        const resourceNode: GraphNode = {
+          id: resource,
+          kind: 'resource',
+          label: resourceLabel,
+          location: { file, line },
+        };
+        scope.resourceNode = resourceNode;
+        scope.resourceLineLex = `${line}}`;
+        nodeList.push(resourceNode);
+      } else if (scope.resourceNode.location) {
+        const lex = `${line}}`;
+        if (lex < (scope.resourceLineLex ??= `${scope.resourceNode.location.line}}`)) {
+          scope.resourceNode.location.line = line;
+          scope.resourceLineLex = lex;
+        }
+      }
+      const dataLabel = scope.dataLabel ??= `${kind} data matching ${path}`;
       addNode(data, 'data', dataLabel, line);
-      const findingIds = findings.map(value => value.id);
-      graph.edges.push({ id: `${findings[0].id}:entry`, from: entry, to: resource, kind: 'public-rule-grant',
-        findingIds, evidence, confidence: 'confirmed' },
-      { id: `${findings[0].id}:data`, from: resource, to: data, kind: read ? 'read-data' : 'write-data',
-        findingIds, evidence, confidence: 'confirmed' });
+      const firstFinding = (readFinding ?? writeFinding)!;
+      const dataKind: GraphEdge['kind'] = read ? 'read-data' : 'write-data';
+      if (!collapseDuplicateEdges) {
+        const findingIds: string[] = [];
+        if (readFinding) findingIds.push(readFinding.id);
+        if (writeFinding) findingIds.push(writeFinding.id);
+        if (wildcardFinding) findingIds.push(wildcardFinding.id);
+        graph.edges.push({ id: `${firstFinding.id}:entry`, from: entry, to: resource, kind: 'public-rule-grant',
+          findingIds, evidence, confidence: 'confirmed' },
+        { id: `${firstFinding.id}:data`, from: resource, to: data, kind: dataKind,
+          findingIds, evidence, confidence: 'confirmed' });
+      } else {
+        accumulateEdge(`${firstFinding.id}:entry`, entry, resource, 'public-rule-grant', 'confirmed', evidence,
+          readFinding, writeFinding, wildcardFinding);
+        accumulateEdge(`${firstFinding.id}:data`, resource, data, dataKind, 'confirmed', evidence,
+          readFinding, writeFinding, wildcardFinding);
+      }
     }
     if (kind === 'firestore' && writeCreateUpdate &&
       /request\.auth/.test(condition) && /\/(?:users|profiles|accounts|members)(?:\/|$)/i.test(path) &&
@@ -310,12 +509,19 @@ export function parseFirebaseRules(source: string, file: string,
         'If this document stores trusted role or privilege fields, authenticated writers may be able to modify them. Function-based validation and application trust require review.', evidence);
       const authenticated = 'entry:firebase:authenticated';
       addNode(authenticated, 'entry', 'Authenticated Firebase client');
-      addNode(data, 'data', `Potential privilege fields at ${path}`, line);
-      graph.edges.push({ id: finding.id, from: authenticated, to: data, kind: 'potential-privilege-field-write',
-        findingIds: [finding.id], evidence, confidence: 'potential' });
+      addNode(data, 'data', scope.privFieldsLabel ??= `Potential privilege fields at ${path}`, line);
+      if (!collapseDuplicateEdges) {
+        graph.edges.push({ id: finding.id, from: authenticated, to: data, kind: 'potential-privilege-field-write',
+          findingIds: [finding.id], evidence, confidence: 'potential' });
+      } else {
+        accumulateEdge(finding.id, authenticated, data, 'potential-privilege-field-write', 'potential', evidence, finding);
+      }
     }
+  });
+  if (collapseDuplicateEdges && edgeMap) {
+    graph.edges = Array.from(edgeMap.values(), item => item.edge);
   }
-  graph.nodes = [...nodes.values()];
+  graph.nodes = nodeList;
   graph.limitations.push(`${file}: Static rules analysis recognizes literal public grants and potential field-allowlist omissions; it does not evaluate functions, compound expressions, rule validity, or deployed configuration.`);
   return graph;
 }

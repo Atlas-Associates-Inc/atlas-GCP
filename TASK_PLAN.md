@@ -117,7 +117,7 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
 - Keep `readSafeSource` unchanged: reject all symlink components, root escapes, `.git`, and `node_modules`; safely analyze explicit Firebase Rules references in other excluded directories.
 - Reject recognized security input links and aliases to them, broken/out-of-root links, `.github` segments in either link or canonical target paths, excluded file/directory targets, and special targets. Check excluded and symlinked target components before accepting files or directories. Ignore ordinary intra-root non-input file links; record a limitation for directory links whose canonical targets are reachable without excluded or symlinked components, without re-traversing them.
 - Preserve zero runtime/development dependencies, offline operation, read-only target handling, traversal/input bounds, and every existing feature. The legacy agent-state directory exclusion is defensive filesystem handling only; it adds no vendor integration.
-- **Allowed Files**: `ATLAS.md`, `TASK_PLAN.md`, `README.md`, `SECURITY.md`, `CONTRIBUTING.md`, `package.json`, `bin/atlas-shield.mjs`, `src/graph/firebase-rules-parser.ts`, `src/graph/attack-graph.ts`, `test/phase2.test.ts`.
+- **Allowed Files**: `ATLAS.md`, `TASK_PLAN.md`, `README.md`, `SECURITY.md`, `CONTRIBUTING.md`, `package.json`, `bin/atlas-shield.mjs`, `src/graph/firebase-rules-parser.ts`, `src/graph/attack-graph.ts`, `test/graph.test.ts`, `test/phase2.test.ts`.
 - **Do Not**: Change other files, add repository directories or dependencies, modify Git metadata/index, perform release builds, commit/push/PR/publish/deploy, or change live Rules. Independent Two-Epoch orthogonal audit is required after local verification; implementation is never self-certified.
 
 ### Task List
@@ -164,6 +164,18 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
     - Extend deterministic test coverage in `test/phase2.test.ts` to assert that `README.md` is a safe, BOM-free, BiDi-free, regular UTF-8 file without PEM headers or unsupported tokens, preserves `[English](#english)`, `[日本語](#日本語)`, `## English`, and `## 日本語`, contains exact 20 table rows in `<details>` without `[!NOTE]`, and delegates to English and Japanese sections.
   - **Do Not**: Mutate files outside scope, add npm dependencies or new directories, alter git metadata, or weaken English/Japanese canonical specifications.
   - **Local Verification**: Deterministic acceptance gates (`npm run check` and `npm test`) verified clean by `atlas-implement`; independent `Astra xhigh` read-only audit remains pending.
+
+- [x] **Task-16: Sub-120ms Dense Firebase Parser & Monomorphic Hex Sort for Shared CI Runners**
+  - **Target Files**: `src/graph/firebase-rules-parser.ts`, `src/graph/attack-graph.ts`, `test/graph.test.ts`, `TASK_PLAN.md`.
+  - **Scope**:
+    - Add 1-slot MRU hash cache in `addFinding` to eliminate redundant hashing of identical `(file, line, ruleId, evidence)` tuples on dense single-line rule blocks.
+    - Implement monotonic cursor fast path (`O(1)` amortized) in `createLineIndex` with binary search fallback.
+    - Define pure ASCII character-code fast helpers (`isSpaceCode`, `isLowerAlphaCode`, `isWordCode`, `isWordOrDotCode`, `isOperatorResetCode`, `isPathOrMemberDelimiter`, `isHeaderKeywordAt`, `isCelInOperatorAt`) and implement zero-allocation, zero-regex linear `headerKeyword` state machine in `forEachAllowClause` with `isCelInOperatorAt` boundary check while keeping `scanAllowClauses` generator 100% compatible; eliminate regex backtracking and quote-stripping DoS on escaped quotes/newlines and prevent path-boundary erasure on `/in`, `/sign-in`, `/in-box`, and `.in`, verified by `< 200 ms` adversarial regression tests in `test/graph.test.ts`.
+    - Eliminate 40,000 unique `resource` node `Map` insertions in `parseFirebaseRules` using dedicated `nodeList` and scope-attached `resourceNode` / `resourceLineLex` tracking and lazy `resourceLabel` / `dataLabel` string computation.
+    - Cache finding title & message strings per `FirebaseScope` and support optional `collapseDuplicateEdges` pre-aggregation in `parseFirebaseRules` (enabled in `scanDirectory`), eliminating 100k transient `GraphEdge` allocations and 22-GC heap churn under the 256 MiB cap.
+    - Specialize `sortByHexPrefix` into monomorphic `sortStringsByHexPrefix` and `sortItemsByIdHexPrefix` and replace `.every(...)` closure calls in `mergeGraphs` and `mergeTwoSortedUnique` with indexed `arraysEqual` helper.
+  - **Do Not**: Modify test thresholds in `test/graph.test.ts`, alter repository metadata, or introduce dependencies.
+  - **Local Verification**: Deterministic acceptance gates (`npm run check` and `npm test`) verified clean by `atlas-implement`; independent Google clean-room audit (Argon High) remains pending.
 
 ### Acceptance Criteria
 1. `npm run check` (exits `0`)

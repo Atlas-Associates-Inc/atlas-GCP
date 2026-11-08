@@ -563,6 +563,10 @@ test('adversarial parser inputs stay below the 200 ms runtime budget', (t) => {
     ['Firebase stripped comments', 'parseFirebaseRules', firestore + 'allow read: if /*' + ' '.repeat(20_000) + '*/}}'],
     ['Firebase repeated unclosed clauses', 'parseFirebaseRules', 'allow read: if x\n'.repeat(5_000)],
     ['Firebase repeated clauses inside a match', 'parseFirebaseRules', firestore + 'allow read: if x\n'.repeat(5_000) + '}}'],
+    ['Firebase parenthesized header keywords before map brace', 'parseFirebaseRules',
+      'service cloud.firestore { match /a { allow read: if (' + 'match '.repeat(80_000) + '{).x {} } }'],
+    ['Firebase escaped quotes and newline before map brace', 'parseFirebaseRules',
+      'service cloud.firestore { match /a { allow read: if ["' + '\\"'.repeat(100_000) + '\\\n", {}] == []; } }'],
     ['IAM repeated account separators', 'parseIamPolicy', JSON.stringify({ resource: malformedAccount, bindings: [] })],
     ['Terraform repeated account separators', 'parseTerraform',
       `resource "google_service_account_iam_member" "b" { service_account_id = "${malformedAccount}" role = "roles/iam.workloadIdentityUser" member = "user:fixture@example.invalid" }`],
@@ -624,6 +628,7 @@ test('Firebase allow conditions preserve balanced CEL maps and following clauses
     "request.resource.data == {'match': 'function service; { }', 'nested': {'service': true}}",
     'request.resource.data.service == {}', 'request.resource.data.service in {}',
     "request.resource.data.note == 'match /fake' && request.resource.data != {}",
+    '["\\\n match ", {}].size() > 0',
     '(request.resource.data != {}) && request.resource.data != {}']) {
     const condition = 'request.auth != null && ' + expression;
     const source = `service cloud.firestore { match /users/{uid} { allow write: if ${condition}; allow get; } }`;
@@ -637,7 +642,7 @@ test('Firebase allow conditions preserve balanced CEL maps and following clauses
 });
 
 test('Firebase unterminated allows reset at new block headers without swallowing nested matches', () => {
-  for (const header of ['match /posts/{id}', 'match /my-posts', 'function check()', 'service cloud.firestore']) {
+  for (const header of ['match /posts/{id}', 'match /my-posts', 'match /in', 'match /sign-in', 'match /in-box', 'match /files.in', 'function check()', 'service cloud.firestore']) {
     const source = `service cloud.firestore { match /users/{uid} {
       allow write: if request.auth != null
       ${header} { allow get: if false; }

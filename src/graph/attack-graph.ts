@@ -27,31 +27,31 @@ const HEX_NIBBLE = new Int8Array(128).fill(-1);
 for (let c = 48; c <= 57; c++) HEX_NIBBLE[c] = c - 48;
 for (let c = 97; c <= 102; c++) HEX_NIBBLE[c] = c - 97 + 10;
 
-function sortByHexPrefix<T>(items: readonly T[], getId: (item: T) => string): T[] {
+function sortStringsByHexPrefix(items: readonly string[]): string[] {
   const len = items.length;
   if (len < 512) {
-    return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+    return items.slice().sort(compare);
   }
   const counts = new Uint32Array(65536);
   const buckets = new Uint16Array(len);
   for (let i = 0; i < len; i++) {
-    const id = getId(items[i]);
+    const id = items[i];
     if (id.length < 4) {
-      return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+      return items.slice().sort(compare);
     }
     const c0 = id.charCodeAt(0);
     const c1 = id.charCodeAt(1);
     const c2 = id.charCodeAt(2);
     const c3 = id.charCodeAt(3);
     if (c0 >= 128 || c1 >= 128 || c2 >= 128 || c3 >= 128) {
-      return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+      return items.slice().sort(compare);
     }
     const d0 = HEX_NIBBLE[c0];
     const d1 = HEX_NIBBLE[c1];
     const d2 = HEX_NIBBLE[c2];
     const d3 = HEX_NIBBLE[c3];
     if (d0 < 0 || d1 < 0 || d2 < 0 || d3 < 0) {
-      return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+      return items.slice().sort(compare);
     }
     const bucket = (d0 << 12) | (d1 << 8) | (d2 << 4) | d3;
     buckets[i] = bucket;
@@ -66,7 +66,64 @@ function sortByHexPrefix<T>(items: readonly T[], getId: (item: T) => string): T[
     sum += c;
   }
   if (maxBucket > 64) {
-    return items.slice().sort((a, b) => compare(getId(a), getId(b)));
+    return items.slice().sort(compare);
+  }
+  const out = new Array<string>(len);
+  for (let i = 0; i < len; i++) {
+    out[counts[buckets[i]]++] = items[i];
+  }
+  for (let i = 1; i < len; i++) {
+    const cur = out[i];
+    let j = i - 1;
+    while (j >= 0 && out[j] > cur) {
+      out[j + 1] = out[j];
+      j--;
+    }
+    out[j + 1] = cur;
+  }
+  return out;
+}
+
+function sortItemsByIdHexPrefix<T extends { id: string }>(items: readonly T[]): T[] {
+  const len = items.length;
+  if (len < 512) {
+    return items.slice().sort((a, b) => compare(a.id, b.id));
+  }
+  const counts = new Uint32Array(65536);
+  const buckets = new Uint16Array(len);
+  for (let i = 0; i < len; i++) {
+    const id = items[i].id;
+    if (id.length < 4) {
+      return items.slice().sort((a, b) => compare(a.id, b.id));
+    }
+    const c0 = id.charCodeAt(0);
+    const c1 = id.charCodeAt(1);
+    const c2 = id.charCodeAt(2);
+    const c3 = id.charCodeAt(3);
+    if (c0 >= 128 || c1 >= 128 || c2 >= 128 || c3 >= 128) {
+      return items.slice().sort((a, b) => compare(a.id, b.id));
+    }
+    const d0 = HEX_NIBBLE[c0];
+    const d1 = HEX_NIBBLE[c1];
+    const d2 = HEX_NIBBLE[c2];
+    const d3 = HEX_NIBBLE[c3];
+    if (d0 < 0 || d1 < 0 || d2 < 0 || d3 < 0) {
+      return items.slice().sort((a, b) => compare(a.id, b.id));
+    }
+    const bucket = (d0 << 12) | (d1 << 8) | (d2 << 4) | d3;
+    buckets[i] = bucket;
+    counts[bucket]++;
+  }
+  let maxBucket = 0;
+  let sum = 0;
+  for (let b = 0; b < 65536; b++) {
+    const c = counts[b];
+    if (c > maxBucket) maxBucket = c;
+    counts[b] = sum;
+    sum += c;
+  }
+  if (maxBucket > 64) {
+    return items.slice().sort((a, b) => compare(a.id, b.id));
   }
   const out = new Array<T>(len);
   for (let i = 0; i < len; i++) {
@@ -74,9 +131,9 @@ function sortByHexPrefix<T>(items: readonly T[], getId: (item: T) => string): T[
   }
   for (let i = 1; i < len; i++) {
     const cur = out[i];
-    const curId = getId(cur);
+    const curId = cur.id;
     let j = i - 1;
-    while (j >= 0 && getId(out[j]) > curId) {
+    while (j >= 0 && out[j].id > curId) {
       out[j + 1] = out[j];
       j--;
     }
@@ -86,8 +143,8 @@ function sortByHexPrefix<T>(items: readonly T[], getId: (item: T) => string): T[
 }
 
 function byId<T extends { id: string }>(items: readonly T[]): T[] {
-  if (items.length === 0) return [];
-  const sorted = sortByHexPrefix(items, item => item.id);
+  if (items.length <= 1) return items.slice();
+  const sorted = sortItemsByIdHexPrefix(items);
   const result: T[] = [sorted[0]];
   for (let i = 1; i < sorted.length; i++) {
     const item = sorted[i];
@@ -105,7 +162,7 @@ function byId<T extends { id: string }>(items: readonly T[]): T[] {
 
 function uniqueSortedStrings(values: readonly string[]): string[] {
   if (values.length === 0) return [];
-  const sorted = sortByHexPrefix(values, s => s);
+  const sorted = sortStringsByHexPrefix(values);
   const result: string[] = [sorted[0]];
   for (let i = 1; i < sorted.length; i++) {
     const cur = sorted[i];
@@ -114,6 +171,15 @@ function uniqueSortedStrings(values: readonly string[]): string[] {
     }
   }
   return result;
+}
+
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 /** Merge without modifying parser results; output order is independent of traversal order. */
@@ -170,8 +236,7 @@ export function mergeGraphs(graphs: readonly GraphResult[]): GraphResult {
   const processedEdges: GraphEdge[] = [];
   for (const entry of edges.values()) {
     let findingIds: string[];
-    if (lastRawIds && lastSortedIds && lastRawIds.length === entry.findingIds.length &&
-      lastRawIds.every((id, k) => id === entry.findingIds[k])) {
+    if (lastRawIds && lastSortedIds && arraysEqual(lastRawIds, entry.findingIds)) {
       findingIds = lastSortedIds.slice();
     } else {
       findingIds = uniqueSortedStrings(entry.findingIds);
@@ -180,7 +245,16 @@ export function mergeGraphs(graphs: readonly GraphResult[]): GraphResult {
     }
     processedEdges.push({ ...entry.edge, findingIds });
   }
-  result.edges = processedEdges.sort((a, b) => compare(a.id, b.id));
+  if (processedEdges.length <= 2) {
+    if (processedEdges.length === 2 && compare(processedEdges[0].id, processedEdges[1].id) > 0) {
+      const temp = processedEdges[0];
+      processedEdges[0] = processedEdges[1];
+      processedEdges[1] = temp;
+    }
+    result.edges = processedEdges;
+  } else {
+    result.edges = processedEdges.sort((a, b) => compare(a.id, b.id));
+  }
   result.paths = byId(graphs.flatMap(graph => graph.paths));
   result.limitations = unique(graphs.flatMap(graph => graph.limitations));
   return result;
@@ -194,7 +268,7 @@ function isStrictlySorted(ids: readonly string[]): boolean {
 }
 
 function mergeTwoSortedUnique(a: readonly string[], b: readonly string[]): readonly string[] {
-  if (a.length === b.length && a.every((val, i) => val === b[i])) return a;
+  if (arraysEqual(a, b)) return a;
   const merged: string[] = [];
   let i = 0, j = 0;
   while (i < a.length && j < b.length) {
@@ -634,7 +708,7 @@ export function scanDirectory(directory: string): GraphResult {
     if (name === 'firebase.json') continue;
     const ruleKind = ruleFiles.get(file) ?? (/^(?:firestore|storage)\.rules$|\.(?:firestore|storage)\.rules\.sample$/.test(name)
       ? name.includes('storage.rules') ? 'storage' : 'firestore' : undefined);
-    const parser = ruleKind ? (source: string) => parseFirebaseRules(source, file, ruleKind)
+    const parser = ruleKind ? (source: string) => parseFirebaseRules(source, file, ruleKind, true)
       : isAuditLogFilename(name) ? (source: string) => parseAuditLogs(source, file)
       : isSccFindingsFilename(name) ? (source: string) => parseSccFindings(source, file)
       : /(?:^|[-_.\s])[Ii][Aa][Mm](?=[-_.\sA-Z0-9])|[a-z0-9](?:Iam|IAM)(?=[-_.\sA-Z0-9])/.test(name) && /\.json$/i.test(name)

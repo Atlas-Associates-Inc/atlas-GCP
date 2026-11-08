@@ -177,6 +177,17 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
   - **Do Not**: Modify test thresholds in `test/graph.test.ts`, alter repository metadata, or introduce dependencies.
   - **Local Verification**: Deterministic acceptance gates (`npm run check` and `npm test`) verified clean by `atlas-implement`; independent Google clean-room audit (Argon High) remains pending.
 
+- [x] **Task-17: Sub-55ms Duplicate-Edge Merge, 32-Bit Hex Key Sort & Cloud Run Correlation Fast Path**
+  - **Target Files**: `src/graph/firebase-rules-parser.ts`, `src/graph/attack-graph.ts`, `TASK_PLAN.md`.
+  - **Scope**:
+    - Implement 1-slot MRU clause cache in `forEachAllowClause` and defensive `operations.slice()` in `scanAllowClauses` (`src/graph/firebase-rules-parser.ts`).
+    - Implement 32-bit packed hex-prefix (`hi32`) radix + insertion sort with scalar hex-prefix skip in `sortStringsByHexPrefix`, `sortItemsByIdWithHexKeys`, `sortItemsByIdHexPrefix`, and `byId` (`src/graph/attack-graph.ts`).
+    - Optimize `mergeGraphs` with lazy `serialized` node stringification, zero-copy single-edge `findingIds` accumulator, and single-graph `result.findings` ID projection (`src/graph/attack-graph.ts`).
+    - Add `trustedSorted` fast path to `findAttackPaths` and call `findAttackPaths(graph, true)` in `scanDirectory` (`src/graph/attack-graph.ts`).
+    - Add `{` block guard in `field()` and precompute `nameKey` and alias-rewriting guards in `correlateResources()` (`src/graph/attack-graph.ts`).
+  - **Do Not**: Mutate files outside scope, modify test files or budgets, alter git metadata, or introduce dependencies.
+  - **Local Verification**: Deterministic acceptance gates (`npm run check` and `npm test`) verified clean by `atlas-implement`; independent Google clean-room audit (Argon High) remains pending.
+
 ### Acceptance Criteria
 1. `npm run check` (exits `0`)
 2. `npm test` (exits `0`)

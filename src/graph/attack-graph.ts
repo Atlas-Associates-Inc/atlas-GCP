@@ -27,35 +27,35 @@ const HEX_NIBBLE = new Int8Array(128).fill(-1);
 for (let c = 48; c <= 57; c++) HEX_NIBBLE[c] = c - 48;
 for (let c = 97; c <= 102; c++) HEX_NIBBLE[c] = c - 97 + 10;
 
+function packHex32(id: string): number {
+  if (id.length < 8) return -1;
+  const c0 = id.charCodeAt(0), c1 = id.charCodeAt(1), c2 = id.charCodeAt(2), c3 = id.charCodeAt(3);
+  const c4 = id.charCodeAt(4), c5 = id.charCodeAt(5), c6 = id.charCodeAt(6), c7 = id.charCodeAt(7);
+  if (c0 >= 128 || c1 >= 128 || c2 >= 128 || c3 >= 128 || c4 >= 128 || c5 >= 128 || c6 >= 128 || c7 >= 128) {
+    return -1;
+  }
+  const d0 = HEX_NIBBLE[c0], d1 = HEX_NIBBLE[c1], d2 = HEX_NIBBLE[c2], d3 = HEX_NIBBLE[c3];
+  const d4 = HEX_NIBBLE[c4], d5 = HEX_NIBBLE[c5], d6 = HEX_NIBBLE[c6], d7 = HEX_NIBBLE[c7];
+  if (d0 < 0 || d1 < 0 || d2 < 0 || d3 < 0 || d4 < 0 || d5 < 0 || d6 < 0 || d7 < 0) {
+    return -1;
+  }
+  return (((d0 << 28) | (d1 << 24) | (d2 << 20) | (d3 << 16) | (d4 << 12) | (d5 << 8) | (d6 << 4) | d7) >>> 0);
+}
+
 function sortStringsByHexPrefix(items: readonly string[]): string[] {
   const len = items.length;
   if (len < 512) {
     return items.slice().sort(compare);
   }
   const counts = new Uint32Array(65536);
-  const buckets = new Uint16Array(len);
+  const hi32 = new Uint32Array(len);
   for (let i = 0; i < len; i++) {
-    const id = items[i];
-    if (id.length < 4) {
+    const k = packHex32(items[i]);
+    if (k < 0) {
       return items.slice().sort(compare);
     }
-    const c0 = id.charCodeAt(0);
-    const c1 = id.charCodeAt(1);
-    const c2 = id.charCodeAt(2);
-    const c3 = id.charCodeAt(3);
-    if (c0 >= 128 || c1 >= 128 || c2 >= 128 || c3 >= 128) {
-      return items.slice().sort(compare);
-    }
-    const d0 = HEX_NIBBLE[c0];
-    const d1 = HEX_NIBBLE[c1];
-    const d2 = HEX_NIBBLE[c2];
-    const d3 = HEX_NIBBLE[c3];
-    if (d0 < 0 || d1 < 0 || d2 < 0 || d3 < 0) {
-      return items.slice().sort(compare);
-    }
-    const bucket = (d0 << 12) | (d1 << 8) | (d2 << 4) | d3;
-    buckets[i] = bucket;
-    counts[bucket]++;
+    hi32[i] = k;
+    counts[k >>> 16]++;
   }
   let maxBucket = 0;
   let sum = 0;
@@ -69,50 +69,43 @@ function sortStringsByHexPrefix(items: readonly string[]): string[] {
     return items.slice().sort(compare);
   }
   const out = new Array<string>(len);
+  const outHi = new Uint32Array(len);
   for (let i = 0; i < len; i++) {
-    out[counts[buckets[i]]++] = items[i];
+    const k = hi32[i];
+    const pos = counts[k >>> 16]++;
+    out[pos] = items[i];
+    outHi[pos] = k;
   }
   for (let i = 1; i < len; i++) {
+    const curK = outHi[i];
+    if (outHi[i - 1] < curK) continue;
     const cur = out[i];
     let j = i - 1;
-    while (j >= 0 && out[j] > cur) {
+    while (j >= 0 && (outHi[j] > curK || (outHi[j] === curK && out[j] > cur))) {
       out[j + 1] = out[j];
+      outHi[j + 1] = outHi[j];
       j--;
     }
     out[j + 1] = cur;
+    outHi[j + 1] = curK;
   }
   return out;
 }
 
-function sortItemsByIdHexPrefix<T extends { id: string }>(items: readonly T[]): T[] {
+function sortItemsByIdWithHexKeys<T extends { id: string }>(items: readonly T[]): { sorted: T[]; hi32?: Uint32Array } {
   const len = items.length;
   if (len < 512) {
-    return items.slice().sort((a, b) => compare(a.id, b.id));
+    return { sorted: items.slice().sort((a, b) => compare(a.id, b.id)) };
   }
   const counts = new Uint32Array(65536);
-  const buckets = new Uint16Array(len);
+  const hi32 = new Uint32Array(len);
   for (let i = 0; i < len; i++) {
-    const id = items[i].id;
-    if (id.length < 4) {
-      return items.slice().sort((a, b) => compare(a.id, b.id));
+    const k = packHex32(items[i].id);
+    if (k < 0) {
+      return { sorted: items.slice().sort((a, b) => compare(a.id, b.id)) };
     }
-    const c0 = id.charCodeAt(0);
-    const c1 = id.charCodeAt(1);
-    const c2 = id.charCodeAt(2);
-    const c3 = id.charCodeAt(3);
-    if (c0 >= 128 || c1 >= 128 || c2 >= 128 || c3 >= 128) {
-      return items.slice().sort((a, b) => compare(a.id, b.id));
-    }
-    const d0 = HEX_NIBBLE[c0];
-    const d1 = HEX_NIBBLE[c1];
-    const d2 = HEX_NIBBLE[c2];
-    const d3 = HEX_NIBBLE[c3];
-    if (d0 < 0 || d1 < 0 || d2 < 0 || d3 < 0) {
-      return items.slice().sort((a, b) => compare(a.id, b.id));
-    }
-    const bucket = (d0 << 12) | (d1 << 8) | (d2 << 4) | d3;
-    buckets[i] = bucket;
-    counts[bucket]++;
+    hi32[i] = k;
+    counts[k >>> 16]++;
   }
   let maxBucket = 0;
   let sum = 0;
@@ -123,38 +116,71 @@ function sortItemsByIdHexPrefix<T extends { id: string }>(items: readonly T[]): 
     sum += c;
   }
   if (maxBucket > 64) {
-    return items.slice().sort((a, b) => compare(a.id, b.id));
+    return { sorted: items.slice().sort((a, b) => compare(a.id, b.id)) };
   }
   const out = new Array<T>(len);
+  const outHi = new Uint32Array(len);
   for (let i = 0; i < len; i++) {
-    out[counts[buckets[i]]++] = items[i];
+    const k = hi32[i];
+    const pos = counts[k >>> 16]++;
+    out[pos] = items[i];
+    outHi[pos] = k;
   }
   for (let i = 1; i < len; i++) {
+    const curK = outHi[i];
+    if (outHi[i - 1] < curK) continue;
     const cur = out[i];
     const curId = cur.id;
     let j = i - 1;
-    while (j >= 0 && out[j].id > curId) {
+    while (j >= 0 && (outHi[j] > curK || (outHi[j] === curK && out[j].id > curId))) {
       out[j + 1] = out[j];
+      outHi[j + 1] = outHi[j];
       j--;
     }
     out[j + 1] = cur;
+    outHi[j + 1] = curK;
   }
-  return out;
+  return { sorted: out, hi32: outHi };
+}
+
+function sortItemsByIdHexPrefix<T extends { id: string }>(items: readonly T[]): T[] {
+  return sortItemsByIdWithHexKeys(items).sorted;
 }
 
 function byId<T extends { id: string }>(items: readonly T[]): T[] {
   if (items.length <= 1) return items.slice();
-  const sorted = sortItemsByIdHexPrefix(items);
+  const { sorted, hi32 } = sortItemsByIdWithHexKeys(items);
   const result: T[] = [sorted[0]];
-  for (let i = 1; i < sorted.length; i++) {
-    const item = sorted[i];
-    const previous = result[result.length - 1];
-    if (item.id === previous.id) {
-      if (item !== previous && compare(JSON.stringify(item), JSON.stringify(previous)) > 0) {
-        result[result.length - 1] = item;
+  if (hi32) {
+    let prevHi = hi32[0];
+    for (let i = 1; i < sorted.length; i++) {
+      const item = sorted[i];
+      const curHi = hi32[i];
+      if (curHi !== prevHi) {
+        result.push(item);
+        prevHi = curHi;
+      } else {
+        const previous = result[result.length - 1];
+        if (item.id === previous.id) {
+          if (item !== previous && compare(JSON.stringify(item), JSON.stringify(previous)) > 0) {
+            result[result.length - 1] = item;
+          }
+        } else {
+          result.push(item);
+        }
       }
-    } else {
-      result.push(item);
+    }
+  } else {
+    for (let i = 1; i < sorted.length; i++) {
+      const item = sorted[i];
+      const previous = result[result.length - 1];
+      if (item.id === previous.id) {
+        if (item !== previous && compare(JSON.stringify(item), JSON.stringify(previous)) > 0) {
+          result[result.length - 1] = item;
+        }
+      } else {
+        result.push(item);
+      }
     }
   }
   return result;
@@ -182,11 +208,19 @@ function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
   return true;
 }
 
+function matchesFindingsOrder(ids: readonly string[], findings: GraphResult['findings']): boolean {
+  if (ids.length !== findings.length) return false;
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i] !== findings[i].id) return false;
+  }
+  return true;
+}
+
 /** Merge without modifying parser results; output order is independent of traversal order. */
 export function mergeGraphs(graphs: readonly GraphResult[]): GraphResult {
   const result = emptyGraph();
-  const nodes = new Map<string, { node: GraphNode; serialized: string }>();
-  type EdgeAccumulator = { raw: GraphEdge; edge: GraphEdge; findingIds: string[] };
+  const nodes = new Map<string, { node: GraphNode; serialized?: string }>();
+  type EdgeAccumulator = { raw: GraphEdge; edge: GraphEdge; singleIds?: readonly string[]; mergedIds?: string[] };
   const edges = new Map<string, EdgeAccumulator>();
   let mru0: EdgeAccumulator | undefined, mru1: EdgeAccumulator | undefined;
   for (const graph of graphs) {
@@ -195,11 +229,15 @@ export function mergeGraphs(graphs: readonly GraphResult[]): GraphResult {
       if (previous && previous.node.kind === node.kind && previous.node.label === node.label &&
         !!previous.node.location === !!node.location && previous.node.location?.file === node.location?.file &&
         previous.node.location?.line === node.location?.line && previous.node.location?.column === node.location?.column) continue;
-      const serialized = JSON.stringify(node);
       // Prefer a declaration's location over a reference's placeholder metadata.
-      if (!previous || (!previous.node.location && node.location) ||
-        (!!previous.node.location === !!node.location && compare(serialized, previous.serialized) < 0)) {
-        nodes.set(node.id, { node: { ...node }, serialized });
+      if (!previous || (!previous.node.location && node.location)) {
+        nodes.set(node.id, { node: { ...node } });
+      } else if (!!previous.node.location === !!node.location) {
+        const serialized = JSON.stringify(node);
+        const prevSerialized = (previous.serialized ??= JSON.stringify(previous.node));
+        if (compare(serialized, prevSerialized) < 0) {
+          nodes.set(node.id, { node: { ...node }, serialized });
+        }
       }
     }
     for (const edge of graph.edges) {
@@ -216,14 +254,21 @@ export function mergeGraphs(graphs: readonly GraphResult[]): GraphResult {
         const key = `${edge.from.length}:${edge.from}|${edge.to.length}:${edge.to}|${edge.kind.length}:${edge.kind}|${edge.confidence.length}:${edge.confidence}|${edge.evidence}`;
         entry = edges.get(key);
         if (!entry) {
-          entry = { raw: edge, edge: { ...edge }, findingIds: [] };
+          entry = { raw: edge, edge: { ...edge }, singleIds: edge.findingIds };
           edges.set(key, entry);
+          mru1 = mru0;
+          mru0 = entry;
+          continue;
         }
         mru1 = mru0;
         mru0 = entry;
       }
       if (compare(edge.id, entry.edge.id) < 0) entry.edge.id = edge.id;
-      for (const id of edge.findingIds) entry.findingIds.push(id);
+      if (entry.mergedIds === undefined) {
+        entry.mergedIds = entry.singleIds!.slice();
+        entry.singleIds = undefined;
+      }
+      for (const id of edge.findingIds) entry.mergedIds.push(id);
     }
   }
   result.nodes = [...nodes.values()].map(entry => entry.node).sort((a, b) => compare(a.id, b.id));
@@ -231,16 +276,24 @@ export function mergeGraphs(graphs: readonly GraphResult[]): GraphResult {
   result.findings = nonEmptyFindings.length === 1
     ? byId(nonEmptyFindings[0].findings)
     : byId(graphs.flatMap(graph => graph.findings));
+  const onlyFindings = nonEmptyFindings.length === 1 ? nonEmptyFindings[0].findings : undefined;
+  let allFindingIdsProjected: string[] | undefined;
   let lastRawIds: readonly string[] | undefined;
   let lastSortedIds: readonly string[] | undefined;
   const processedEdges: GraphEdge[] = [];
   for (const entry of edges.values()) {
+    const rawIds = entry.mergedIds ?? entry.singleIds!;
     let findingIds: string[];
-    if (lastRawIds && lastSortedIds && arraysEqual(lastRawIds, entry.findingIds)) {
+    if (lastRawIds && lastSortedIds && arraysEqual(lastRawIds, rawIds)) {
       findingIds = lastSortedIds.slice();
+    } else if (onlyFindings && rawIds.length >= 512 && matchesFindingsOrder(rawIds, onlyFindings)) {
+      allFindingIdsProjected ??= result.findings.map(f => f.id);
+      findingIds = allFindingIdsProjected.slice();
+      lastRawIds = rawIds;
+      lastSortedIds = allFindingIdsProjected;
     } else {
-      findingIds = uniqueSortedStrings(entry.findingIds);
-      lastRawIds = entry.findingIds;
+      findingIds = uniqueSortedStrings(rawIds);
+      lastRawIds = rawIds;
       lastSortedIds = findingIds;
     }
     processedEdges.push({ ...entry.edge, findingIds });
@@ -291,14 +344,14 @@ function mergeTwoSortedUnique(a: readonly string[], b: readonly string[]): reado
 }
 
 /** Enumerate simple paths, including transitive impersonation; cycles never recurse. */
-export function findAttackPaths(graph: GraphResult): AttackPath[] {
+export function findAttackPaths(graph: GraphResult, trustedSorted = false): AttackPath[] {
   const nodes = new Map(graph.nodes.map(node => [node.id, node]));
   let hasEscalationFindings = false;
   let minGraphRank = Infinity;
   let findingsSorted = true;
   for (let i = 0; i < graph.findings.length; i++) {
     const finding = graph.findings[i];
-    if (i > 0 && !(graph.findings[i - 1].id < finding.id)) findingsSorted = false;
+    if (!trustedSorted && i > 0 && !(graph.findings[i - 1].id < finding.id)) findingsSorted = false;
     if (finding.ruleId === 'iam/privilege-escalation') hasEscalationFindings = true;
     const r = rank[finding.severity];
     if (r < minGraphRank) minGraphRank = r;
@@ -336,7 +389,7 @@ export function findAttackPaths(graph: GraphResult): AttackPath[] {
     if (last && terminal) {
       if (paths.length >= 1000) { limited = true; return; }
       let findingIds: string[];
-      if (links.every(edge => isStrictlySorted(edge.findingIds))) {
+      if (trustedSorted || links.every(edge => isStrictlySorted(edge.findingIds))) {
         let merged: readonly string[] = links[0].findingIds;
         for (let i = 1; i < links.length; i++) merged = mergeTwoSortedUnique(merged, links[i].findingIds);
         findingIds = merged.slice();
@@ -386,6 +439,7 @@ interface TerraformResource {
 // Read only top-level fields/blocks, ignoring quoted text and nested blocks. This
 // keeps build identities distinct from runtime identities without evaluating HCL.
 function field(body: string, name: string, block = false, allowSingleQuotes = false): string | undefined {
+  if (block && !body.includes('{')) return undefined;
   const bracePairs = block ? buildBraceMap(body, allowSingleQuotes) : new Map<number, number>();
   const identifier = /[A-Za-z_][\w-]*/y;
   let depth = 0;
@@ -436,9 +490,14 @@ function resources(source: string, file: string): TerraformResource[] {
 
 function correlateResources(graph: GraphResult, declarations: TerraformResource[], grantSources: Map<string, string>): void {
   const services = declarations.filter(item => /^google_(?:cloud_run(?:_v2)?_service|cloudfunctions2?_function)$/.test(item.type));
-  const descriptors = services.map(service => ({ ...service, name: literal(service.body, 'name'),
-    project: literal(service.body, 'project'), region: literal(service.body, 'location') ?? literal(service.body, 'region'),
-    family: service.type.includes('cloud_run') ? 'run' : 'cloudfunctions' }));
+  const descriptors = services.map(service => {
+    const name = literal(service.body, 'name');
+    const project = literal(service.body, 'project');
+    const region = literal(service.body, 'location') ?? literal(service.body, 'region');
+    const family = service.type.includes('cloud_run') ? 'run' : 'cloudfunctions';
+    const nameKey = name && project && region ? JSON.stringify([family, project, region, name]) : undefined;
+    return { ...service, name, project, region, family, nameKey };
+  });
   const serviceIds = new Set(services.map(service => service.id));
   // Rebuild runtime connections once, without rescanning all edges for each service.
   graph.edges = graph.edges.filter(edge => !serviceIds.has(edge.from) || edge.kind !== 'potential-runtime-identity-access');
@@ -457,17 +516,15 @@ function correlateResources(graph: GraphResult, declarations: TerraformResource[
   }
   const descriptorsByName = new Map<string, typeof descriptors>();
   for (const service of descriptors) {
-    if (!service.name || !service.project || !service.region) continue;
-    const key = JSON.stringify([service.family, service.project, service.region, service.name]);
-    const matches = descriptorsByName.get(key) ?? [];
+    if (!service.nameKey) continue;
+    const matches = descriptorsByName.get(service.nameKey) ?? [];
     matches.push(service);
-    descriptorsByName.set(key, matches);
+    descriptorsByName.set(service.nameKey, matches);
   }
   const resolvedLimitations = new Set<string>();
   const runtimeConnections = new Map<string, GraphEdge>();
   for (const service of descriptors) {
-    if (service.name && service.project && service.region &&
-      descriptorsByName.get(JSON.stringify([service.family, service.project, service.region, service.name]))?.length === 1) {
+    if (grantsByTarget.size > 0 && service.nameKey && descriptorsByName.get(service.nameKey)?.length === 1) {
       const suffix = `projects/${service.project}/locations/${service.region}/${service.family === 'run' ? 'services' : 'functions'}/${service.name}`;
       const aliases = new Set([`resource:${suffix}`, `resource://${service.family}.googleapis.com/${suffix}`]);
       for (const alias of aliases) {
@@ -736,7 +793,7 @@ export function scanDirectory(directory: string): GraphResult {
     graph = mergeGraphs([graph]);
   }
   const findingCount = graph.findings.length;
-  graph.paths = findAttackPaths(graph);
+  graph.paths = findAttackPaths(graph, true);
   // Path enumeration can append an incomplete-scan finding after merge ordering.
   if (graph.findings.length !== findingCount) graph.findings.sort((a, b) => compare(a.id, b.id));
   graph.limitations.push('Static analysis does not establish deployed policy, runtime exploitability or completeness for unsupported syntax; files must remain stable during scanning.');

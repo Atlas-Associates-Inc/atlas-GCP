@@ -226,6 +226,10 @@ function parseAllowHeader(text: string, start: number, end: number):
 function forEachAllowClause(text: string, emit: (offset: number, operations: string[], condition: string, evidence: string) => void): void {
   let start = -1, quote = 0, escaped = false, parens = 0, boundary = true;
   let afterColon = false, braces = 0, headerKeyword = false;
+  let lastClauseRaw: string | undefined;
+  let lastOperations: string[] | undefined;
+  let lastCondition: string | undefined;
+  let lastEvidence: string | undefined;
   for (let cursor = 0; cursor < text.length; cursor++) {
     const code = text.charCodeAt(cursor);
     if (quote) {
@@ -262,8 +266,28 @@ function forEachAllowClause(text: string, emit: (offset: number, operations: str
       braces = 0;
       headerKeyword = false;
       boundary = true;
-      const clause = offset >= 0 ? parseAllowHeader(text, offset, cursor) : undefined;
-      if (clause) emit(offset, clause.operations, clause.condition, text.slice(offset, cursor + 1).trim());
+      if (offset >= 0) {
+        const rawLen = cursor - offset;
+        if (lastClauseRaw !== undefined && lastClauseRaw.length === rawLen && text.startsWith(lastClauseRaw, offset)) {
+          if (lastOperations !== undefined) {
+            emit(offset, lastOperations, lastCondition!, lastEvidence!);
+          }
+        } else {
+          const raw = text.slice(offset, cursor);
+          lastClauseRaw = raw;
+          const clause = parseAllowHeader(raw, 0, rawLen);
+          if (clause) {
+            lastOperations = clause.operations;
+            lastCondition = clause.condition;
+            lastEvidence = (raw + ';').trim();
+            emit(offset, lastOperations, lastCondition, lastEvidence);
+          } else {
+            lastOperations = undefined;
+            lastCondition = undefined;
+            lastEvidence = undefined;
+          }
+        }
+      }
     } else if (boundary && start < 0 && text.startsWith('allow', cursor) && !isWordOrDotCode(text.charCodeAt(cursor - 1)) &&
       isSpaceCode(text.charCodeAt(cursor + 5))) {
       start = cursor;
@@ -287,7 +311,7 @@ export function* scanAllowClauses(text: string): Generator<{
 }> {
   const clauses: Array<{ offset: number; operations: string[]; condition: string; evidence: string }> = [];
   forEachAllowClause(text, (offset, operations, condition, evidence) => {
-    clauses.push({ offset, operations, condition, evidence });
+    clauses.push({ offset, operations: operations.slice(), condition, evidence });
   });
   for (const clause of clauses) {
     yield clause;

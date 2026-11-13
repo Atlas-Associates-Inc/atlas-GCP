@@ -19,7 +19,7 @@ Use **GitHub Private Vulnerability Reporting** on the GitHub repository hosting 
 
 Include the following in your private report:
 
-- Atlas Shield version or commit hash, and Node.js version.
+- atlas-GCP version or commit hash, and Node.js version.
 - The exact CLI command, Airlock profile (if applicable), and flags.
 - Synthetic reproduction input and steps to reproduce.
 - Expected versus actual security behavior.
@@ -58,7 +58,7 @@ These documented limits alone do not establish a security bypass. A reproducible
 
 非公開報告には次の情報を含めてください。
 
-- Atlas Shieldのバージョンまたはコミットハッシュ、およびNode.jsのバージョン。
+- atlas-GCPのバージョンまたはコミットハッシュ、およびNode.jsのバージョン。
 - 正確なCLIコマンド、該当する場合はAirlockプロファイル、およびフラグ。
 - 合成した再現入力と再現手順。
 - セキュリティ上の期待する挙動と実際の挙動。

@@ -63,7 +63,7 @@ test('dense parsers below 1 MiB stay within 350 ms and bounded heap', (t) => {
       import { parseFirebaseRules } from ${JSON.stringify(new URL('../src/graph/firebase-rules-parser.ts', import.meta.url).href)};
       import { scanDirectory } from ${JSON.stringify(new URL('../src/graph/attack-graph.ts', import.meta.url).href)};
       const source = readFileSync(0, 'utf8');
-      const directory = ${parser === 'scanDirectory'} ? mkdtempSync(join(tmpdir(), 'atlas-shield-complexity-')) : undefined;
+      const directory = ${parser === 'scanDirectory'} ? mkdtempSync(join(tmpdir(), 'atlas-gcp-complexity-')) : undefined;
       try {
         if (directory) writeFileSync(join(directory, ${JSON.stringify(label.startsWith('Firebase') ? 'dense.firestore.rules.sample' : 'main.tf')}), source);
         const start = performance.now();
@@ -152,7 +152,7 @@ test('IAM resource and name limits reject oversized input before expanding any g
 });
 
 test('IAM JSON discovery uses token and camelCase boundaries instead of word substrings', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-iam-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-iam-'));
   const ignored = ['diamond.json', 'parliament.json', 'mediamap.json', 'william.json', 'ciam.json', 'projectiam.json', 'iamish.json'];
   const scanned = ['iam.json', 'iam-policy.json', 'iam_bindings.json', 'project.iam.json', 'project_iam.json',
     'iamPolicy.json', 'serviceIamPolicy.json', 'IAM.json', 'project.Iam.json', 'serviceIAMPolicy.json'];
@@ -176,7 +176,7 @@ test('many remediation findings in one file stay within 350 ms and bounded heap'
     import { join } from 'node:path';
     import { parseFirebaseRules } from ${JSON.stringify(new URL('../src/graph/firebase-rules-parser.ts', import.meta.url).href)};
     import { proposeRemediations } from ${JSON.stringify(new URL('../src/report/remediation.ts', import.meta.url).href)};
-    const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-remediation-'));
+    const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-remediation-'));
     const file = 'dense.firestore.rules.sample', source = readFileSync(0, 'utf8');
     try {
       writeFileSync(join(directory, file), source);
@@ -203,7 +203,7 @@ test('many remediation findings in one file stay within 350 ms and bounded heap'
 });
 
 test('Firebase compact if and allow property references preserve findings and safe diffs', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-rules-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-rules-'));
   const file = 'compact.firestore.rules.sample';
   const source = `service cloud.firestore {
   match /users/{uid} {
@@ -256,7 +256,7 @@ test('IAM null conditions are unconditional, malformed conditions fail closed an
 });
 
 test('Cloud Run v2 IAM name references and literal bindings reach runtime secrets', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-terraform-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-terraform-'));
   const account = 'worker@fixture-project.iam.gserviceaccount.com';
   try {
     writeFileSync(join(directory, 'identity.tf'), `resource "google_project_iam_member" "secrets" {
@@ -297,7 +297,7 @@ test('Cloud Run v2 IAM name references and literal bindings reach runtime secret
 });
 
 test('literal IAM grants preserve both Cloud Run services and the second runtime secret path', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-terraform-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-terraform-'));
   const account = 'privileged@fixture-project.iam.gserviceaccount.com';
   const services = ['tf:.:google_cloud_run_v2_service.svc1', 'tf:.:google_cloud_run_v2_service.svc2'];
   const source = `resource "google_cloud_run_v2_service" "svc1" {
@@ -353,7 +353,7 @@ test('literal and unresolved service IAM scopes never collapse to project scope'
 });
 
 test('indexed correlation preserves service scope, aliases, non-invoker isolation and runtime blocks', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-correlation-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-correlation-'));
   const file = 'services:9:identity:principal.tf';
   const runtime = 'runtime@p.gserviceaccount.com';
   const source = `resource "google_cloud_run_v2_service" "east" {
@@ -690,7 +690,7 @@ test('Terraform extracts only top-level resources and stops at an unclosed tail'
 });
 
 test('HCL heredocs isolate apostrophes, comments, quotes, braces and decoy resources without shifting findings', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-heredoc-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-heredoc-'));
   try {
     for (const marker of ['', '-']) for (const newline of ['\n', '\r\n']) {
       const terminator = marker ? '  EOT \t' : 'EOT \t';
@@ -809,7 +809,7 @@ test('hardened enterprise has no high/blocker findings or attack paths', () => {
 });
 
 test('real Firestore and Storage filenames are discovered outside the repository', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-rules-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-rules-'));
   try {
     for (const service of ['firestore', 'storage']) {
       writeFileSync(join(directory, `${service}.rules`), readFileSync(join(vulnerable, `vulnerable.${service}.rules.sample`)));
@@ -826,7 +826,7 @@ test('real Firestore and Storage filenames are discovered outside the repository
 });
 
 test('unconditional Firebase grants and mixed wildcard paths retain exact scopes and safe diffs', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-rules-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-rules-'));
   const file = 'unconditional.storage.rules.sample';
   const source = `service firebase.storage {
   match /b/{bucket}/o {
@@ -899,7 +899,7 @@ test('WIF service-account impersonation reaches secrets and BigQuery, respecting
 });
 
 test('Terraform email, id and name references correlate runtime identities across files', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-terraform-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-terraform-'));
   try {
     writeFileSync(join(directory, 'identity.tf'), `resource "google_service_account" "worker" {
       account_id = "worker"
@@ -936,7 +936,7 @@ test('Terraform email, id and name references correlate runtime identities acros
 });
 
 test('GKE node identity exposure, Cloud SQL 0.0.0.0/0 paths and Cloud Build default SA grants are detected and remediated', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-gke-sql-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-gke-sql-'));
   const source = [
     'resource "google_container_cluster" "primary" {',
     '  name = "primary"',

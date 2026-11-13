@@ -13,16 +13,16 @@ import { toSarif } from './report/sarif.ts';
 import type { AirlockProfileId, McpConfigClient, ProverMode, Severity } from './types.ts';
 
 const version: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
-const help = `Atlas Shield ${version}
+const help = `atlas-GCP ${version}
 
 Usage:
-  atlas-shield audit <dir> [--format table|json|sarif|blueprint]
+  atlas-gcp audit <dir> [--format table|json|sarif|blueprint]
       [--fail-on blocker|high|medium] [--emit-patch]
       [--prove] [--prover-mode gemini|dual]
-  atlas-shield airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]
-  atlas-shield mcp-config [--profile <name>...] [--client agy|gemini]
-  atlas-shield sanitize < telemetry.txt
-  atlas-shield --help | --version
+  atlas-gcp airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]
+  atlas-gcp mcp-config [--profile <name>...] [--client agy|gemini]
+  atlas-gcp sanitize < telemetry.txt
+  atlas-gcp --help | --version
 
 Audit is offline unless --prove is selected. Reports and proposed patches go to
 stdout; target files are never changed. Defaults: table, fail-on high, gemini.
@@ -127,13 +127,13 @@ function tryRealpath(path: string | undefined): string | undefined {
 }
 
 const entry = tryRealpath(process.argv[1]);
-if (entry && [import.meta.url, new URL('../bin/atlas-shield.mjs', import.meta.url)]
+if (entry && [import.meta.url, new URL('../bin/atlas-gcp.mjs', import.meta.url)]
   .some(url => entry === tryRealpath(fileURLToPath(url)))) {
   process.stdout.on('error', () => { process.exitCode = 2; });
   main(process.argv.slice(2)).then(code => { process.exitCode = process.exitCode || code; }).catch(error => {
     // Native I/O/argument errors may include untrusted paths or snippets.
     const message = error instanceof Error ? error.message : 'Operation failed.';
-    process.stderr.write(`Atlas Shield: ${redactSecrets(message).replace(/[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ' ')}\n`);
+    process.stderr.write(`atlas-GCP: ${redactSecrets(message).replace(/[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ' ')}\n`);
     process.exitCode = 2;
   });
 }

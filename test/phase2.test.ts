@@ -25,13 +25,13 @@ const target = `projects/-/serviceAccounts/${account}`;
 const pass = { status: 'PASS', rationale: 'Offline test evidence is bounded.' };
 
 function temporary(t: TestContext): string {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-phase2-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-phase2-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   return directory;
 }
 
 function cli(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string } = {}) {
-  const result = spawnSync(process.execPath, [join(root, 'bin/atlas-shield.mjs'), ...args], {
+  const result = spawnSync(process.execPath, [join(root, 'bin/atlas-gcp.mjs'), ...args], {
     cwd: options.cwd ?? root, input: options.input ?? '', encoding: 'utf8', timeout: 10_000, maxBuffer: 2 * 1024 * 1024,
     env: { PATH: process.env.PATH, LANG: 'C', ...options.env },
   });
@@ -787,26 +787,26 @@ test('mcp-config emits deterministic agy/gemini wrappers in selected order with 
     assert.equal(result.status, 0, result.stderr);
     const config = JSON.parse(result.stdout);
     assert.deepEqual(config, buildMcpConfig({ profiles: ['semgrep', 'firebase', 'semgrep'], client }));
-    assert.deepEqual(Object.keys(config.mcpServers), ['atlas-shield-semgrep', 'atlas-shield-firebase']);
+    assert.deepEqual(Object.keys(config.mcpServers), ['atlas-gcp-semgrep', 'atlas-gcp-firebase']);
     for (const profile of ['semgrep', 'firebase']) {
-      const server = config.mcpServers[`atlas-shield-${profile}`];
+      const server = config.mcpServers[`atlas-gcp-${profile}`];
       const policy = getAirlockProfile(profile)!;
-      assert.equal(server.command, 'atlas-shield');
+      assert.equal(server.command, 'atlas-gcp');
       assert.deepEqual(server.args.slice(0, 5), ['airlock', '--profile', profile, '--upstream-cmd', policy.upstreamCommand]);
       assert.deepEqual(server.args.slice(5), policy.upstreamArgs.map(arg => `--upstream-arg=${arg}`));
     }
-    assert.ok(config.mcpServers['atlas-shield-firebase'].args.includes('--upstream-arg=--no-install'));
+    assert.ok(config.mcpServers['atlas-gcp-firebase'].args.includes('--upstream-arg=--no-install'));
     assert.equal(cli(args, { cwd: directory, env: { HOME: directory, PATH: directory } }).stdout, result.stdout);
     assert.deepEqual(readdirSync(directory), before);
     assert.equal(readFileSync(join(directory, 'settings.json'), 'utf8'), sentinel);
   }
   const all = buildMcpConfig();
-  assert.deepEqual(Object.keys(all.mcpServers), Object.keys(profileTools).map(profile => `atlas-shield-${profile}`));
+  assert.deepEqual(Object.keys(all.mcpServers), Object.keys(profileTools).map(profile => `atlas-gcp-${profile}`));
   for (const server of Object.values(all.mcpServers)) {
     if (server.args[4] === 'npx') assert.ok(server.args.includes('--upstream-arg=--no-install'));
   }
-  all.mcpServers['atlas-shield-scc'].args.push('client-mutation');
-  assert.equal(buildMcpConfig().mcpServers['atlas-shield-scc'].args.includes('client-mutation'), false);
+  all.mcpServers['atlas-gcp-scc'].args.push('client-mutation');
+  assert.equal(buildMcpConfig().mcpServers['atlas-gcp-scc'].args.includes('client-mutation'), false);
 });
 
 test('mcp-config rejects unsupported clients, flags and positionals without emitting partial JSON', () => {
@@ -881,7 +881,7 @@ test('generated --upstream-arg= flags roundtrip through CLI parsing without inst
       process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { args: process.argv.slice(2) } }) + '\\n');
     });`, { mode: 0o700 });
   const config = buildMcpConfig({ profiles: ['firebase'] });
-  const args = config.mcpServers['atlas-shield-firebase'].args;
+  const args = config.mcpServers['atlas-gcp-firebase'].args;
   const result = cli(args, { env: { PATH: directory }, input: JSON.stringify({ jsonrpc: '2.0', id: 1,
     method: 'tools/call', params: { name: profileTools.firebase, arguments: {} } }) + '\n' });
   assert.equal(result.status, 0, result.stderr);
@@ -891,7 +891,7 @@ test('generated --upstream-arg= flags roundtrip through CLI parsing without inst
 
 test('installed node_modules package layout executes CLI commands and rejects symlinked src escapes', (t) => {
   const directory = temporary(t);
-  const pkgDir = join(directory, 'node_modules/@atlas-sec/shield');
+  const pkgDir = join(directory, 'node_modules/@atlas-sec/gcp');
   const binDir = join(directory, 'node_modules/.bin');
   mkdirSync(pkgDir, { recursive: true });
   mkdirSync(binDir, { recursive: true });
@@ -902,8 +902,8 @@ test('installed node_modules package layout executes CLI commands and rejects sy
     cpSync(join(root, item), join(pkgDir, item), { recursive: true });
   }
 
-  const binLink = join(binDir, 'atlas-shield');
-  symlinkSync('../@atlas-sec/shield/bin/atlas-shield.mjs', binLink);
+  const binLink = join(binDir, 'atlas-gcp');
+  symlinkSync('../@atlas-sec/gcp/bin/atlas-gcp.mjs', binLink);
 
   const run = (args: string[]) => {
     return spawnSync(process.execPath, args, {
@@ -916,7 +916,7 @@ test('installed node_modules package layout executes CLI commands and rejects sy
 
   const helpResult = run([binLink, '--help']);
   assert.equal(helpResult.status, 0);
-  assert.ok(helpResult.stdout.startsWith(`Atlas Shield ${packageJson.version}`));
+  assert.ok(helpResult.stdout.startsWith(`atlas-GCP ${packageJson.version}`));
   assert.ok(!helpResult.stderr.includes('ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING'));
 
   const versionResult = run(['--preserve-symlinks-main', binLink, '--version']);
@@ -943,7 +943,7 @@ test('installed node_modules package layout executes CLI commands and rejects sy
     const escapeResult = run(args);
     assert.equal(escapeResult.status, 2);
     assert.equal(escapeResult.stdout, '');
-    assert.match(escapeResult.stderr, /Atlas Shield: Refusing to (?:resolve|load) module outside package src directory\./);
+    assert.match(escapeResult.stderr, /atlas-GCP: Refusing to (?:resolve|load) module outside package src directory\./);
   }
 
   const linkedSrcPkg = join(directory, 'linked-src-pkg');
@@ -951,14 +951,14 @@ test('installed node_modules package layout executes CLI commands and rejects sy
   mkdirSync(join(linkedSrcPkg, 'bin'), { recursive: true });
   mkdirSync(externalSrc, { recursive: true });
   cpSync(join(root, 'package.json'), join(linkedSrcPkg, 'package.json'));
-  cpSync(join(root, 'bin/atlas-shield.mjs'), join(linkedSrcPkg, 'bin/atlas-shield.mjs'));
+  cpSync(join(root, 'bin/atlas-gcp.mjs'), join(linkedSrcPkg, 'bin/atlas-gcp.mjs'));
   writeFileSync(join(externalSrc, 'cli.ts'), "process.stdout.write('EXTERNAL_SRC\\n');\n");
   symlinkSync(externalSrc, join(linkedSrcPkg, 'src'));
 
-  const externalSrcResult = run([join(linkedSrcPkg, 'bin/atlas-shield.mjs'), '--help']);
+  const externalSrcResult = run([join(linkedSrcPkg, 'bin/atlas-gcp.mjs'), '--help']);
   assert.equal(externalSrcResult.status, 2);
   assert.equal(externalSrcResult.stdout, '');
-  assert.match(externalSrcResult.stderr, /Atlas Shield: Refusing to load module outside package src directory\./);
+  assert.match(externalSrcResult.stderr, /atlas-GCP: Refusing to load module outside package src directory\./);
 
   const linkedTarget = join(directory, 'linked-target');
   const linkedConsumer = join(directory, 'linked-consumer');
@@ -969,9 +969,9 @@ test('installed node_modules package layout executes CLI commands and rejects sy
   for (const item of packageJson.files) {
     cpSync(join(root, item), join(linkedTarget, item), { recursive: true });
   }
-  symlinkSync(linkedTarget, join(linkedConsumer, 'node_modules/@atlas-sec/shield'));
-  const linkedBin = join(linkedConsumer, 'node_modules/.bin/atlas-shield');
-  symlinkSync('../@atlas-sec/shield/bin/atlas-shield.mjs', linkedBin);
+  symlinkSync(linkedTarget, join(linkedConsumer, 'node_modules/@atlas-sec/gcp'));
+  const linkedBin = join(linkedConsumer, 'node_modules/.bin/atlas-gcp');
+  symlinkSync('../@atlas-sec/gcp/bin/atlas-gcp.mjs', linkedBin);
 
   const linkedVersionResult = run([linkedBin, '--version']);
   assert.equal(linkedVersionResult.status, 0);
@@ -987,6 +987,6 @@ test('installed node_modules package layout executes CLI commands and rejects sy
     const linkedEscapeResult = run(args);
     assert.equal(linkedEscapeResult.status, 2);
     assert.equal(linkedEscapeResult.stdout, '');
-    assert.match(linkedEscapeResult.stderr, /Atlas Shield: Refusing to (?:resolve|load) module outside package src directory\./);
+    assert.match(linkedEscapeResult.stderr, /atlas-GCP: Refusing to (?:resolve|load) module outside package src directory\./);
   }
 });

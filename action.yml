@@ -1,4 +1,4 @@
-name: Atlas Shield
+name: atlas-GCP
 description: Offline GCP and Firebase attack-path audit with deterministic exit codes
 inputs:
   directory:
@@ -6,7 +6,7 @@ inputs:
     required: false
     default: '.'
   format:
-    description: Report format (table, json, or sarif)
+    description: Report format (table, json, sarif, or blueprint)
     required: false
     default: table
   fail-on:
@@ -23,5 +23,5 @@ runs:
         ATLAS_FORMAT: ${{ inputs.format }}
         ATLAS_FAIL_ON: ${{ inputs.fail-on }}
       run: >-
-        node "$GITHUB_ACTION_PATH/bin/atlas-shield.mjs" audit
+        node "$GITHUB_ACTION_PATH/bin/atlas-gcp.mjs" audit
         --format="$ATLAS_FORMAT" --fail-on="$ATLAS_FAIL_ON" -- "$ATLAS_DIRECTORY"

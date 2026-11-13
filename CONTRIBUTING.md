@@ -1,4 +1,4 @@
-# Contributing to Atlas Shield / コントリビューションガイド
+# Contributing to atlas-GCP / コントリビューションガイド
 
 [English](#english) · [日本語](#日本語)
 
@@ -6,10 +6,10 @@
 
 ### Runtime & Zero-Build Setup
 
-Use Node.js **`>=22.18.0`**; CI pins `'>=22.18.0 <23'`. Atlas Shield runs directly on Node.js native erasable TypeScript support. No install or build step is required. From the repository root, run:
+Use Node.js **`>=22.18.0`**; CI pins `'>=22.18.0 <23'`. atlas-GCP runs directly on Node.js native erasable TypeScript support. No install or build step is required. From the repository root, run:
 
 ```sh
-node bin/atlas-shield.mjs --help
+node bin/atlas-gcp.mjs --help
 ```
 
 ### Core Engineering Invariants
@@ -27,7 +27,7 @@ Run these commands from the repository root and require exit `0` for each:
 ```sh
 npm run check
 npm test
-node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
+node bin/atlas-gcp.mjs audit fixtures/hardened-enterprise
 ```
 
 `npm test` runs test files sequentially (`--test-concurrency=1`) so deterministic wall-clock parser benchmarks do not compete across workers.
@@ -40,10 +40,10 @@ By contributing, you agree that your contributions are licensed under **Apache-2
 
 ### 実行環境とビルド不要のセットアップ
 
-Node.js **`>=22.18.0`** を使用してください。CIでは `'>=22.18.0 <23'` に固定しています。Atlas ShieldはNode.jsのネイティブなerasable TypeScript対応を利用して直接実行します。インストールやビルドは不要です。リポジトリルートで次を実行してください。
+Node.js **`>=22.18.0`** を使用してください。CIでは `'>=22.18.0 <23'` に固定しています。atlas-GCPはNode.jsのネイティブなerasable TypeScript対応を利用して直接実行します。インストールやビルドは不要です。リポジトリルートで次を実行してください。
 
 ```sh
-node bin/atlas-shield.mjs --help
+node bin/atlas-gcp.mjs --help
 ```
 
 ### 開発で守る不変条件
@@ -61,7 +61,7 @@ node bin/atlas-shield.mjs --help
 ```sh
 npm run check
 npm test
-node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
+node bin/atlas-gcp.mjs audit fixtures/hardened-enterprise
 ```
 
 `npm test` はテストファイルを逐次実行します（`--test-concurrency=1`）。これにより、決定論的な実時間ベースのパーサーベンチマークが複数ワーカー間で競合するのを防ぎます。

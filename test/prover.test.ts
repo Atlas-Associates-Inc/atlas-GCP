@@ -37,7 +37,7 @@ function environment(t: TestContext, values: Record<string, string>): void {
 }
 
 function fakeClis(t: TestContext, outcome: string): string {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-adapters-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-adapters-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   environment(t, { PATH: directory, TMPDIR: directory, ATLAS_GEMINI_BACKEND: 'agy' });
   const source = `#!${process.execPath}
@@ -113,7 +113,7 @@ test('CLI adapter failures fail closed and clean temporary prompt and output dir
       if (['nonzero', 'malformed', 'timeout', 'extra-top', 'extra-proof'].includes(outcome)) assert.equal(result.lanes.argonHigh.status, 'ERROR');
       // Abort cleanup continues in the adapter's finally after the lane deadline wins.
       await new Promise(resolve => setImmediate(resolve));
-      assert.equal(readdirSync(directory).some(name => name.startsWith('atlas-shield-')), false);
+      assert.equal(readdirSync(directory).some(name => name.startsWith('atlas-gcp-')), false);
     });
   }
 });

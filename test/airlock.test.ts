@@ -326,7 +326,7 @@ lines.on('line', line => {
 `;
 
 async function exchange(source: string, messages: unknown[] | string) {
-  const script = join(tmpdir(), `atlas-shield-airlock-${randomUUID()}.mjs`);
+  const script = join(tmpdir(), `atlas-gcp-airlock-${randomUUID()}.mjs`);
   const input = new PassThrough();
   const output = new PassThrough();
   let received = '';

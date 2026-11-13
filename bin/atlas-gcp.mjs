@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const [major = 0, minor = 0] = process.versions.node.split('.').map(Number);
 if (major < 22 || (major === 22 && minor < 18)) {
-  process.stderr.write('Atlas Shield: Node.js >=22.18.0 is required.\n');
+  process.stderr.write('atlas-GCP: Node.js >=22.18.0 is required.\n');
   process.exit(2);
 }
 
@@ -98,6 +98,6 @@ try {
 } catch (error) {
   const rawMessage = error instanceof Error ? error.message : 'Bootstrap failed.';
   const clean = rawMessage.replace(/[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ' ');
-  process.stderr.write(`Atlas Shield: ${clean}\n`);
+  process.stderr.write(`atlas-GCP: ${clean}\n`);
   process.exit(2);
 }

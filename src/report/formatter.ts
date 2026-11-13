@@ -13,7 +13,7 @@ export function displayText(text: string): string {
 }
 
 export function formatTable(graph: GraphResult, prover?: DualProverVerdict, remediations: Remediation[] = []): string {
-  const lines = ['Atlas Shield', 'SEVERITY  LOCATION  FINDING'];
+  const lines = ['atlas-GCP', 'SEVERITY  LOCATION  FINDING'];
   for (const finding of graph.findings) {
     lines.push(`${finding.severity.toUpperCase().padEnd(8)}  ${displayText(finding.location.file)}:${finding.location.line}  ${displayText(finding.title)} [${finding.ruleId}]`);
     lines.push(`          ${displayText(finding.message)}`);
@@ -45,9 +45,9 @@ export function formatBlueprint(graph: GraphResult, prover?: DualProverVerdict, 
   for (const finding of graph.findings) counts[finding.severity]++;
   const incomplete = graph.findings.some(finding => finding.ruleId.startsWith('scan/'));
   const lines = [
-    '# Atlas Shield — Autonomous Security & DX Blueprint',
+    '# atlas-GCP — Autonomous Cloud/DX/AI Consulting & Security Blueprint',
     '',
-    '## 1. Executive Risk Summary',
+    '## 1. Executive Risk Summary (In-House Consulting AI — Zero External Consultants Needed)',
     `- Scan Status: ${incomplete ? 'INCOMPLETE (resolve scan/* diagnostics first)' : 'COMPLETE'}`,
     `- Findings: ${graph.findings.length} total (BLOCKER: ${counts.blocker}, HIGH: ${counts.high}, MEDIUM: ${counts.medium}, LOW: ${counts.low})`,
     `- Reachable Cross-Boundary Attack Paths: ${graph.paths.length}`,
@@ -61,9 +61,9 @@ export function formatBlueprint(graph: GraphResult, prover?: DualProverVerdict, 
   lines.push(
     '',
     '## 2. Autonomous 30 / 60 / 90-Day Remediation Roadmap',
-    '- **Phase 1 (Day 1-30 — Immediate Containment & AI Airlock)**: Eliminate BLOCKER and confirmed public exposures (Firebase rules, 0.0.0.0/0 Cloud SQL, public invokers, logging tampering) and wrap internal AI MCP servers with `atlas-shield mcp-config --client gemini`.',
+    '- **Phase 1 (Day 1-30 — Immediate Containment & AI Airlock)**: Eliminate BLOCKER and confirmed public exposures (Firebase rules, 0.0.0.0/0 Cloud SQL, public invokers, logging tampering) and wrap internal AI MCP servers with `atlas-gcp mcp-config --client gemini`.',
     '- **Phase 2 (Day 31-60 — Identity & Workload Hardening)**: Replace default Compute/AppEngine/CloudBuild/GKE service accounts with least-privilege identities, enable GKE Workload Identity, enforce Cloud SQL TLS, and pin GitHub WIF `attribute.repository`.',
-    '- **Phase 3 (Day 61-90 — Continuous Self-Driving CI/CD Gate)**: Enforce `atlas-shield audit` in GitHub Actions pull-request checks so posture drift is blocked automatically without external consultants.',
+    '- **Phase 3 (Day 61-90 — Continuous Self-Driving CI/CD Gate)**: Enforce `atlas-gcp audit` in GitHub Actions pull-request checks so posture drift is blocked automatically without external consultants.',
     '',
     '## 3. Prioritized Findings & Control Domains',
   );
@@ -96,9 +96,9 @@ export function formatBlueprint(graph: GraphResult, prover?: DualProverVerdict, 
   }
   lines.push(
     '',
-    '## 7. Execution Mode (Free Self-Service vs 2-Hour Online Sprint)',
-    '- **Tier 0 — Free Self-Service (Apache-2.0, ¥0)**: Feed this blueprint into your internal AI agent, review and apply the proposed diffs, and enable the GitHub Actions CI gate.',
-    '- **Tier 1 — Optional 2-Hour Online Implementation Sprint**: Share this redacted blueprint (no cloud credentials required) for a focused 2-hour live remediation, MCP Airlock onboarding, and CI gate verification session.',
+    '## 7. Execution Mode (In-House Consulting AI vs Optional 2-Hour Online Sprint)',
+    '- **Tier 0 — Instant In-House Consulting AI (Apache-2.0, ¥0 / Free)**: Load `atlas-GCP` into your company\'s AI agent to instantly build an enterprise Cloud/DX/AI consulting AI in-house, making external consulting firms (such as Slalom or Big 4) completely unnecessary.',
+    '- **Tier 1 — Optional 2-Hour Online Implementation Sprint (¥100,000 JP / $750 Global)**: Share this redacted blueprint (zero cloud credentials required) for a focused 2-hour live remediation, MCP Airlock onboarding, and CI gate verification session.',
   );
   return lines.join('\n') + '\n';
 }

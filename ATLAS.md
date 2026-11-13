@@ -1,9 +1,9 @@
-# ATLAS.md — Atlas Shield (`atlas-shield`) Canonical SSoT
+# ATLAS.md — atlas-GCP (`atlas-gcp`) Canonical SSoT
 
 ## 1. Mission & Identity
-- **Product Name**: **Atlas Shield** (`@atlas-sec/shield` / CLI: `atlas-shield`)
+- **Product Name**: **atlas-GCP** (`@atlas-sec/gcp` / CLI: `atlas-gcp`)
 - **License**: Apache-2.0 (Enterprise-ready Open Source Software with explicit patent grant)
-- **Mission**: Protect enterprises and engineering teams worldwide from cloud cyberattacks by deterministically discovering and formally proving **GCP × Firebase cross-boundary attack paths**, while eliminating AI SecOps self-compromise (credential leaks, cloud mis-mutations, and indirect prompt injection).
+- **Mission**: Enable enterprises worldwide to instantly build an in-house Cloud, DX, and AI Security Consulting AI by loading this repository into their own AI agents—making external consulting firms (such as Slalom or Big 4) completely unnecessary—while deterministically discovering and formally proving **GCP × Firebase cross-boundary attack paths** and eliminating AI SecOps self-compromise (credential leaks, cloud mis-mutations, and indirect prompt injection).
 
 ## 2. First-Principles Architectural Pillars
 
@@ -12,11 +12,11 @@
 | **L0: Deterministic Attack Graph** | `src/graph/**` | Parse `firestore.rules`, `storage.rules`, `firebase.json`, Terraform (`*.tf`), GCP IAM Policy JSON, GitHub Actions WIF (`*.yml`), Cloud Audit Logs (`*cloud-audit*.json`, `*cloud-audit*.ndjson`, `*cloudaudit*.json`, `*gcp-audit*.json`, `*audit-log*.json`, `*audit-logs*.ndjson` with token/camelCase boundaries), and Security Command Center findings (`*scc*.json`) into a unified directed graph; enumerate static and runtime-observed cross-boundary attack paths offline in milliseconds. | Zero LLM dependency, zero network access, deterministic exit codes for CI/CD PR gates. |
 | **L1: Zero-Trust MCP Airlock** | `src/airlock/**` | Thin JSON-RPC 2.0 stdio proxy with per-server hardened profiles (`scc`, `secops`, `firebase`, `cloudrun`, `developer-knowledge`, `prowler`, `semgrep`) wrapping official OSS & Google MCP servers. | **Fail-closed Read-Only tool & profile allowlists**, private-key/JWT/token redaction, and Indirect Prompt Injection neutralization on untrusted cloud logs. |
 | **L2: Sovereign AI Prover** | `src/prove/**` | Supports two first-class execution modes:<br/>1. **`dual` Mode**: **Argon High** (`gemini-4-argon-high` Conductor / Patch Synthesis) × **Astra Ultra** (`gpt-6-astra`, `effort="ultra"`, `-s read-only --ephemeral` Counterexample Prover).<br/>2. **`gemini` Mode (Pure Gemini Sovereign Mode)**: 100% Gemini / Vertex AI closed-perimeter zero-retention execution (**Argon High** `gemini-4-argon-high` Architect + **Hydrogen XHigh** `gemini-4-hydrogen-xhigh` Red-Team Prover passes with zero non-Google provider dependency). | **Non-Majority Fail-Closed Gate**: Any reproducible exploit proof triggers a `BLOCKER` verdict; empty/malformed/timed-out output fails closed as `ERROR`. |
-| **CLI & SARIF/Diff Reporter** | `src/cli.ts`, `src/report/**` | Single-command developer UX (`atlas-shield audit <dir> [--format table|json|sarif|blueprint]`, `atlas-shield airlock [--profile <name>]`, `atlas-shield mcp-config`, `atlas-shield sanitize`) outputting human-readable tables, Executive & Autonomous Remediation Blueprints, GitHub Code Scanning SARIF v2.1.0, Airlock MCP configs, and minimal remediation diffs. | Never mutates cloud state or local user repositories; outputs proposed configs and diffs to `stdout` only. |
+| **CLI & SARIF/Diff Reporter** | `src/cli.ts`, `src/report/**` | Single-command developer UX (`atlas-gcp audit <dir> [--format table|json|sarif|blueprint]`, `atlas-gcp airlock [--profile <name>]`, `atlas-gcp mcp-config`, `atlas-gcp sanitize`) outputting human-readable tables, Executive & Autonomous Remediation Blueprints, GitHub Code Scanning SARIF v2.1.0, Airlock MCP configs, and minimal remediation diffs. | Never mutates cloud state or local user repositories; outputs proposed configs and diffs to `stdout` only. |
 
 ## 3. Hard Engineering & Supply-Chain Invariants
 1. **Zero Runtime npm Supply-Chain Surface**: Built on **Node.js `>=22.18.0` native erasable TypeScript (`.ts`)** using exclusively Node built-in modules (`node:fs`, `node:path`, `node:module`, `node:crypto`, `node:child_process`, `node:util`, `node:readline`, `node:test`). `package.json` MUST keep `"dependencies": {}`.
-2. **Mechanical Write Prohibition**: Atlas Shield MUST NEVER execute mutating cloud commands (`firebase deploy`, `gcloud ... update/delete/deploy/set-iam-policy`) or forward mutating MCP tool calls (`deploy`, `create`, `update`, `delete`, `set`, `init`, `evaluate`).
+2. **Mechanical Write Prohibition**: atlas-GCP MUST NEVER execute mutating cloud commands (`firebase deploy`, `gcloud ... update/delete/deploy/set-iam-policy`) or forward mutating MCP tool calls (`deploy`, `create`, `update`, `delete`, `set`, `init`, `evaluate`).
 3. **Untrusted Telemetry Isolation**: All cloud log entries, resource labels, and third-party MCP responses MUST pass through deterministic secret redaction and prompt-injection boundary sanitization before entering any model prompt.
 4. **Model & Repository Governance (Zero-Claude Policy)**:
    - Canonical repository root: `/Users/takayukimiyano/StudioProjects/GCP`

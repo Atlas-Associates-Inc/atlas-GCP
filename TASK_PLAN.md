@@ -1,7 +1,7 @@
-# TASK_PLAN.md — Atlas Shield (`@atlas-sec/shield`) Phase 1 Frozen Order
+# TASK_PLAN.md — atlas-GCP (`@atlas-sec/gcp`) Phase 1 Frozen Order
 
 ## Architecture / Overview
-**Atlas Shield** (`atlas-shield`) is an Apache-2.0 open-source sovereign cloud cybersecurity engine built with zero external runtime dependencies on **Node.js >= 22.18.0 native erasable TypeScript (`.ts`)**.
+**atlas-GCP** (`atlas-gcp`) is an Apache-2.0 open-source sovereign cloud cybersecurity & autonomous consulting AI engine built with zero external runtime dependencies on **Node.js >= 22.18.0 native erasable TypeScript (`.ts`)**.
 
 It protects enterprises worldwide against real-world **GCP × Firebase** cyberattacks via three strictly separated layers:
 1. **L0 Deterministic Cross-Boundary Attack Graph (`src/graph/`)**: Offline static & graph analyzer correlating Firebase Rules (`firestore.rules`, `storage.rules`, `*.firestore.rules.sample`, `*.storage.rules.sample`), `firebase.json`, Terraform (`*.tf`), GCP IAM Policy JSON (`*iam*.json`), and GitHub Actions Workload Identity Federation (`.github/workflows/*.yml`, `*wif*.tf`) into a unified directed graph to detect reachable cross-boundary breach paths (`Entry Point -> Exposure/Rules Seam -> Service Account / IAM Escalation -> Crown Jewel Data/Secrets`) and synthesize proposed unified-diff remediations without mutating target files.
@@ -26,8 +26,8 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
 ## Task List
 
 - [x] **Task-1: Package, Licensing & Core Type Contracts**
-  - **Target Files**: `LICENSE`, `package.json`, `bin/atlas-shield.mjs`, `src/types.ts`
-  - **Scope**: Add Apache-2.0 `LICENSE`; configure `package.json` (`name: "@atlas-sec/shield"`, `version: "0.1.0"`, `license: "Apache-2.0"`, `type: "module"`, `engines: { "node": ">=22.18.0" }`, `bin: { "atlas-shield": "./bin/atlas-shield.mjs" }`, `dependencies: {}`, scripts `check` and `test`); define strict erasable TypeScript interfaces supporting both `dual` (`argonHigh` + `astraUltra`) and `gemini` (`argonArchitect` + `geminiRedTeam`) prover modes.
+  - **Target Files**: `LICENSE`, `package.json`, `bin/atlas-gcp.mjs`, `src/types.ts`
+  - **Scope**: Add Apache-2.0 `LICENSE`; configure `package.json` (`name: "@atlas-sec/gcp"`, `version: "0.1.0"`, `license: "Apache-2.0"`, `type: "module"`, `engines: { "node": ">=22.18.0" }`, `bin: { "atlas-gcp": "./bin/atlas-gcp.mjs" }`, `dependencies: {}`, scripts `check` and `test`); define strict erasable TypeScript interfaces supporting both `dual` (`argonHigh` + `astraUltra`) and `gemini` (`argonArchitect` + `geminiRedTeam`) prover modes.
   - **Do Not**: Add external npm dependencies or non-erasable TypeScript syntax (`enum`, `namespace`, parameter properties).
 
 - [x] **Task-2: L0 Deterministic GCP × Firebase Cross-Boundary Attack Graph Engine**
@@ -47,7 +47,7 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
 
 - [x] **Task-5: CLI, SARIF v2.1.0 Reporter, CI Action & OSS Documentation**
   - **Target Files**: `src/report/sarif.ts`, `src/report/formatter.ts`, `src/cli.ts`, `action.yml`, `.github/workflows/ci.yml`, `README.md`
-  - **Scope**: Implement `atlas-shield audit <dir> [--format table|json|sarif] [--fail-on blocker|high|medium] [--emit-patch] [--prove] [--prover-mode gemini|dual]`, `atlas-shield airlock --upstream-cmd <cmd> [--upstream-arg <arg>...]`, and `atlas-shield sanitize`; valid SARIF v2.1.0 output; GitHub Action `action.yml` + `.github/workflows/ci.yml`; bilingual EN/JA `README.md`.
+  - **Scope**: Implement `atlas-gcp audit <dir> [--format table|json|sarif] [--fail-on blocker|high|medium] [--emit-patch] [--prove] [--prover-mode gemini|dual]`, `atlas-gcp airlock --upstream-cmd <cmd> [--upstream-arg <arg>...]`, and `atlas-gcp sanitize`; valid SARIF v2.1.0 output; GitHub Action `action.yml` + `.github/workflows/ci.yml`; bilingual EN/JA `README.md`.
   - **Do Not**: Mutate user files during `audit`.
 
 - [x] **Task-6: Enterprise Fixtures & Deterministic Verification Suite**
@@ -61,7 +61,7 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
 
 ---
 
-## Phase 2 Frozen Order (`@atlas-sec/shield` v0.2.0 — Airlock Profiles, Cloud Audit Threat Hunting & SCC Correlation)
+## Phase 2 Frozen Order (`@atlas-sec/gcp` v0.2.0 — Airlock Profiles, Cloud Audit Threat Hunting & SCC Correlation)
 
 ### Phase 2 Scope & Non-Goals
 - **Zero New Subdirectories**: Place all new source, fixture, and test files inside existing directories (`src/airlock/`, `src/graph/`, `src/report/`, `fixtures/vulnerable-enterprise/`, `fixtures/hardened-enterprise/`, `test/`).
@@ -75,8 +75,8 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
   - **Target Files**: `src/types.ts`, `src/airlock/profiles.ts`, `src/airlock/mcp-guard.ts`, `src/airlock/stdio-proxy.ts`, `src/cli.ts`
   - **Scope**:
     - Define curated zero-trust read-only Airlock profiles (`scc`, `secops`, `firebase`, `cloudrun`, `developer-knowledge`, `prowler`, `semgrep`) in `src/airlock/profiles.ts` with strict per-profile tool-name patterns (layered on top of `isReadOnlyTool()` — both must pass!), recommended upstream command templates, and required read-only flags.
-    - Add `--profile <name>` to `atlas-shield airlock` (`runStdioProxy`) so `tools/list` and `tools/call` reject any tool outside the selected profile's allowlist with JSON-RPC error `-32600`.
-    - Add `atlas-shield mcp-config [--profile <name>...] [--client agy|gemini]` emitting non-mutating JSON configuration to `stdout` that wraps each selected upstream MCP server in `atlas-shield airlock --profile <name> --upstream-cmd ...`.
+    - Add `--profile <name>` to `atlas-gcp airlock` (`runStdioProxy`) so `tools/list` and `tools/call` reject any tool outside the selected profile's allowlist with JSON-RPC error `-32600`.
+    - Add `atlas-gcp mcp-config [--profile <name>...] [--client agy|gemini]` emitting non-mutating JSON configuration to `stdout` that wraps each selected upstream MCP server in `atlas-gcp airlock --profile <name> --upstream-cmd ...`.
   - **Do Not**: Write to user home directories (`~/.gemini`, etc.), execute upstream commands during `mcp-config`, or include Claude/Anthropic client formats.
 
 - [x] **Task-8: Cloud Audit Logs Threat-Hunting Parser & Runtime Attack-Graph Correlation**
@@ -117,7 +117,7 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
 - Keep `readSafeSource` unchanged: reject all symlink components, root escapes, `.git`, and `node_modules`; safely analyze explicit Firebase Rules references in other excluded directories.
 - Reject recognized security input links and aliases to them, broken/out-of-root links, `.github` segments in either link or canonical target paths, excluded file/directory targets, and special targets. Check excluded and symlinked target components before accepting files or directories. Ignore ordinary intra-root non-input file links; record a limitation for directory links whose canonical targets are reachable without excluded or symlinked components, without re-traversing them.
 - Preserve zero runtime/development dependencies, offline operation, read-only target handling, traversal/input bounds, and every existing feature. The legacy agent-state directory exclusion is defensive filesystem handling only; it adds no vendor integration.
-- **Allowed Files**: `ATLAS.md`, `TASK_PLAN.md`, `README.md`, `SECURITY.md`, `CONTRIBUTING.md`, `package.json`, `bin/atlas-shield.mjs`, `src/graph/firebase-rules-parser.ts`, `src/graph/attack-graph.ts`, `test/graph.test.ts`, `test/phase2.test.ts`.
+- **Allowed Files**: `ATLAS.md`, `TASK_PLAN.md`, `README.md`, `SECURITY.md`, `CONTRIBUTING.md`, `package.json`, `bin/atlas-gcp.mjs`, `src/graph/firebase-rules-parser.ts`, `src/graph/attack-graph.ts`, `test/graph.test.ts`, `test/phase2.test.ts`.
 - **Do Not**: Change other files, add repository directories or dependencies, modify Git metadata/index, perform release builds, commit/push/PR/publish/deploy, or change live Rules. Independent Two-Epoch orthogonal audit is required after local verification; implementation is never self-certified.
 
 ### Task List
@@ -137,16 +137,16 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
   - **Target Files**: `SECURITY.md`, `CONTRIBUTING.md`, `ATLAS.md`, `test/phase2.test.ts`, `TASK_PLAN.md`.
   - **Scope**:
     - Create bilingual (`## English` / `## 日本語`) `SECURITY.md` documenting supported versions (`0.2.x`), private vulnerability reporting via GitHub Private Vulnerability Reporting (without inventing email addresses or unverified repo URLs), zero-secret reporting hygiene, in-scope security defects, and explicit out-of-scope / architectural boundaries matching `README.md`.
-    - Create bilingual (`## English` / `## 日本語`) `CONTRIBUTING.md` documenting Node.js `>=22.18.0` (`>=22.18.0 <23` in CI), zero runtime/dev npm dependencies, erasable TypeScript syntax, unchanged `package.json` `"files"` allowlist (`["bin/", "src/", "LICENSE", "README.md", "action.yml"]`), repository safety rules (no literal `firestore.rules`/`storage.rules`/`database.rules.json` or PEM headers, no extra subdirectories), EN/JA `README.md` parity, Apache-2.0 licensing, and deterministic local verification (`npm run check`, `npm test`, `node bin/atlas-shield.mjs audit fixtures/hardened-enterprise`).
+    - Create bilingual (`## English` / `## 日本語`) `CONTRIBUTING.md` documenting Node.js `>=22.18.0` (`>=22.18.0 <23` in CI), zero runtime/dev npm dependencies, erasable TypeScript syntax, unchanged `package.json` `"files"` allowlist (`["bin/", "src/", "LICENSE", "README.md", "action.yml"]`), repository safety rules (no literal `firestore.rules`/`storage.rules`/`database.rules.json` or PEM headers, no extra subdirectories), EN/JA `README.md` parity, Apache-2.0 licensing, and deterministic local verification (`npm run check`, `npm test`, `node bin/atlas-gcp.mjs audit fixtures/hardened-enterprise`).
     - Update `ATLAS.md` lines 24-26 development governance bullets so prohibition wording (`abolished and prohibited`) passes `atlas-sync.sh --check-repos` and matches the Two-Epoch development governance (`Astra xhigh`, `Argon High`, and `Gemini 3.8 Flash High` through `2026-11-08` JST; `Argon High` and `Gemini 3.8 Flash High` from `2026-11-09` JST onward), without altering runtime prover contracts in line 14.
     - Add a deterministic regression test in `test/phase2.test.ts` validating `SECURITY.md` and `CONTRIBUTING.md` presence, bilingual anchors, Node floor alignment, zero `scan/*` errors on repo-root scan, and unchanged `package.json` `"files"`. Mark `Task-13` `[x]` in `TASK_PLAN.md` once `npm run check` and `npm test` exit `0`.
   - **Do Not**: Modify `package.json`, `src/**`, `bin/**`, `action.yml`, `.github/**`, `README.md`, or `fixtures/**`; invent contact emails or unverified repository URLs; or run `git commit` / `git push` / `gh repo create`.
   - **Local Verification**: 2026-11-04 JST — `npm run check` and `npm test` both exited `0` (190 passed, 0 failed/skipped; Node.js v22.19.0). Hardened fixture audit exited `0`; the regression test confirmed zero repository-root `scan/*` findings. `atlas-sync.sh --check-repos /Users/takayukimiyano/StudioProjects/GCP` passed with no warnings. EN/JA technical tokens and sections match; both documents are non-empty UTF-8 regular files without a BOM, unsupported vendor/tier tokens, external URLs, or literal PEM private-key headers. Independent Google audit remains pending; this is not release approval.
 
 - [x] **Task-14: Installed node_modules CLI Bootstrap, O(N) Sorted Path Finding-ID Merge & Governance Token Test Precision**
-  - **Target Files**: `bin/atlas-shield.mjs`, `src/graph/firebase-rules-parser.ts`, `src/graph/attack-graph.ts`, `test/phase2.test.ts`, `ATLAS.md`, `CONTRIBUTING.md`, `TASK_PLAN.md`.
+  - **Target Files**: `bin/atlas-gcp.mjs`, `src/graph/firebase-rules-parser.ts`, `src/graph/attack-graph.ts`, `test/phase2.test.ts`, `ATLAS.md`, `CONTRIBUTING.md`, `TASK_PLAN.md`.
   - **Scope**:
-    - Bootstrap `bin/atlas-shield.mjs` cleanly across checkout, `npm link`, and `node_modules` layouts (including via symlinks and `--preserve-symlinks-main`); verify `pkgRoot`, `package.json`, `src`, and nested `src` segments via `lstatSync` + `realpathSync` (rejecting symlinked `src` directories); register the `resolve` boundary hook unconditionally across checkout, `npm link`, and `node_modules` layouts while restricting dynamic `stripTypeScriptTypes` loading hooks to `node_modules` installations to avoid `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` and reject any traversal escape or symlink escape outside the package `src` directory with exit `2`.
+    - Bootstrap `bin/atlas-gcp.mjs` cleanly across checkout, `npm link`, and `node_modules` layouts (including via symlinks and `--preserve-symlinks-main`); verify `pkgRoot`, `package.json`, `src`, and nested `src` segments via `lstatSync` + `realpathSync` (rejecting symlinked `src` directories); register the `resolve` boundary hook unconditionally across checkout, `npm link`, and `node_modules` layouts while restricting dynamic `stripTypeScriptTypes` loading hooks to `node_modules` installations to avoid `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` and reject any traversal escape or symlink escape outside the package `src` directory with exit `2`.
     - Optimize `src/graph/firebase-rules-parser.ts` via one-shot `node:crypto` `hash('sha256', ...)`, add a 2-slot MRU fast path in `mergeGraphs` (`src/graph/attack-graph.ts`), apply `findAttackPaths` early-exit bounds on graph rank and privilege escalation, optimize multi-edge sorted `findingIds` merging in `findAttackPaths` via linear two-pointer sorted unique merge (`O(N)`), and avoid redundant intermediate array allocations when merging a single graph.
     - Refine the governance unsupported-model token check in `test/phase2.test.ts` to allow approved Two-Epoch models (`Gemini 3.8 Flash High` / `gemini-3.8-flash-high`) while continuing to reject all prohibited models and lightweight tiers.
     - Add regression tests verifying installed `node_modules` CLI execution, symlink preservation, and symlink escape rejection.
@@ -205,6 +205,13 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
     - Implement `formatBlueprint` (`--format blueprint`) in `src/report/formatter.ts` and `src/cli.ts`, outputting an Executive Risk Summary, 30/60/90-Day Autonomous Remediation Roadmap, Control-Domain Prioritized Findings, Attack Paths, Review-Only Diffs, and the Two-Tier Execution Model (Tier 0 Free Self-Service ¥0 vs Tier 1 Optional 2-Hour Online Sprint ¥100,000).
     - Document the new L0 rules, `--format blueprint`, and the Two-Tier Global OSS Onboarding Scheme in both English and Japanese sections of `README.md`.
   - **Do Not**: Add external dependencies or new subdirectories, or mutate scanned files.
+  - **Local Verification**: `npm run check`, `npm test`, and `atlas-sync.sh --check-repos` all exit `0`.
+
+- [x] **Task-20: Complete `atlas-GCP` Rebranding (Zero Legacy `shield` Naming) & Instant In-House Consulting AI Positioning (Making Slalom / External Consulting Firms Unnecessary)**
+  - **Target Files**: `bin/atlas-gcp.mjs`, `package.json`, `action.yml`, `ATLAS.md`, `README.md`, `SECURITY.md`, `CONTRIBUTING.md`, `TASK_PLAN.md`, `src/cli.ts`, `src/airlock/profiles.ts`, `src/prove/dual-prover.ts`, `src/report/formatter.ts`, `src/report/sarif.ts`, `test/airlock.test.ts`, `test/cli.test.ts`, `test/graph.test.ts`, `test/phase2.test.ts`, `test/prover.test.ts`.
+  - **Scope**:
+    - Rename `bin/atlas-shield.mjs` to `bin/atlas-gcp.mjs` and unify product/CLI/package naming to `atlas-GCP` (`atlas-gcp` / `@atlas-sec/gcp`) across all source, CLI output, SARIF driver metadata, Airlock MCP wrapper keys, tests, and documentation.
+    - Explicitly document in `README.md` (EN/JA/20-language overview), `ATLAS.md`, and `formatBlueprint` that loading `atlas-GCP` into an enterprise's internal AI agent instantly builds an in-house Cloud, DX, and AI Security Consulting AI—making external consulting firms (such as Slalom or Big 4) completely unnecessary (`¥0` free self-service), with an optional 2-hour online implementation sprint (`¥100,000` JP / `$750` Global).
   - **Local Verification**: `npm run check`, `npm test`, and `atlas-sync.sh --check-repos` all exit `0`.
 
 ### Acceptance Criteria

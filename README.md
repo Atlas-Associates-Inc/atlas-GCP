@@ -1,10 +1,10 @@
-# Atlas Shield v0.3.0
+# atlas-GCP v0.3.0
 
-Offline GCP × Firebase attack-path analysis, autonomous 30/60/90-day remediation blueprints (`--format blueprint`), a read-only MCP Airlock, and optional Sovereign AI evidence review for enterprise engineering and security teams. GCP × Firebase の攻撃経路をオフラインで解析し、自律改修ブループリント（`--format blueprint`）、読み取り専用 MCP Airlock、任意の AI 証拠レビューを提供します。
+Load this OSS repository into your company's AI agent to **instantly build an in-house Cloud, DX, and AI Security Consulting AI**—making external consulting firms (such as Slalom or Big 4) completely unnecessary—powered by offline GCP × Firebase attack-path analysis, autonomous 30/60/90-day remediation blueprints (`--format blueprint`), a read-only MCP Airlock, and optional Sovereign AI evidence review. 各企業の担当者が本リポジトリを自社 AI に読み込ませるだけで、**Slalom 等の高額な外部コンサルティングファームと同等以上の「自社専用 DX・クラウド・AI セキュリティコンサル AI」を一瞬で構築し、外部コンサルを一切不要にします**。
 
 [English](#english) · [日本語](#日本語)
 
-- **Apache-2.0** — open source, free self-service (`¥0`) / オープンソース・完全無料自走（`¥0`）
+- **Apache-2.0** — open source, instant in-house consulting AI for free (`¥0`) / オープンソース・完全無料で自社専用コンサルAIを即時構築（`¥0`）
 - **Node.js >=22.18.0** — native erasable TypeScript / ネイティブ実行可能な erasable TypeScript
 - **0 npm dependencies** — runtime and development / 実行時・開発時ともに依存パッケージなし
 - **Read-only & offline by default** — zero cloud credentials required for local audit / ローカル監査は既定で読み取り専用・オフライン（クラウド認証情報不要）
@@ -22,14 +22,14 @@ flowchart LR
 <details>
 <summary><strong>Global Overview (20 Languages) / 20言語クイック概要</strong></summary>
 
-> **Note:** The [English](#english) and [日本語](#日本語) sections below are the sole authoritative technical and security-boundary specifications for Atlas Shield, defining all CLI flags, input bounds, and operational guarantees. In particular: exit code `0` is not an absolute completeness or security guarantee, lexical MCP Airlock filtering does not mathematically prove semantic read-only execution, secret and prompt sanitization is not an exhaustive prompt-injection defense, and `--prove` transmits sanitized evidence under caller-configured provider settings and mode names do not guarantee a closed perimeter or zero retention.
+> **Note:** The [English](#english) and [日本語](#日本語) sections below are the sole authoritative technical and security-boundary specifications for atlas-GCP, defining all CLI flags, input bounds, and operational guarantees. In particular: exit code `0` is not an absolute completeness or security guarantee, lexical MCP Airlock filtering does not mathematically prove semantic read-only execution, secret and prompt sanitization is not an exhaustive prompt-injection defense, and `--prove` transmits sanitized evidence under caller-configured provider settings and mode names do not guarantee a closed perimeter or zero retention.
 >
 > **注記:** 以下の [English](#english) および [日本語](#日本語) セクションが、すべてのCLIフラグ、入力上限、および運用上の保証を規定する唯一の正式な技術・セキュリティ境界仕様です。特に、終了コード `0` は完全性や安全性の絶対的保証ではなく、Airlockの字句フィルタリングは意味論的な読み取り専用動作を完全に証明するものではなく、サニタイズは網羅的なプロンプト注入防御ではなく、`--prove` は呼び出し側が設定したプロバイダー設定の下でサニタイズ済み証拠を送信し、モード名は閉じた境界やゼロ保持を保証しません。
 
 | Language | Tag | Summary |
 | --- | --- | --- |
-| English | `en` | An offline-by-default GCP × Firebase cross-boundary attack-path analyzer, read-only MCP Airlock, and optional AI evidence reviewer (Apache-2.0, Node.js >=22.18.0, 0 npm dependencies). Authoritative specifications and security limits are governed exclusively by the [English](#english) and [日本語](#日本語) sections. |
-| 日本語 (Japanese) | `ja` | 既定でオフライン動作するGCP × Firebase横断攻撃経路アナライザー、読み取り専用MCP Airlock、および任意のAI証拠レビュー機能を提供します（Apache-2.0、Node.js >=22.18.0、npm依存関係0）。完全な仕様およびセキュリティ境界は [English](#english) および [日本語](#日本語) セクションが正本となります。 |
+| English | `en` | Load atlas-GCP into your company's AI to instantly build an in-house Cloud/DX/AI consulting AI (eliminating the need for external consulting firms like Slalom), featuring an offline-by-default GCP × Firebase attack-path analyzer, 30/60/90-day Blueprint generator, read-only MCP Airlock, and optional AI evidence reviewer (Apache-2.0, Node.js >=22.18.0, 0 npm dependencies). Authoritative specifications and security limits are governed exclusively by the [English](#english) and [日本語](#日本語) sections. |
+| 日本語 (Japanese) | `ja` | 自社AIに読み込ませるだけでSlalom等の外部コンサルを一瞬で不要にする「自社専用DX・クラウド・AIコンサルAI」を構築できる、既定オフラインのGCP × Firebase横断攻撃経路アナライザー、30/60/90日改修Blueprint生成器、読み取り専用MCP Airlock、および任意のAI証拠レビュー機能を提供します（Apache-2.0、Node.js >=22.18.0、npm依存関係0）。完全な仕様およびセキュリティ境界は [English](#english) および [日本語](#日本語) セクションが正本となります。 |
 | 简体中文 (Simplified Chinese) | `zh-Hans` | 默认离线的 GCP × Firebase 跨边界攻击路径分析器、只读 MCP Airlock 以及可选的 AI 证据审查工具（Apache-2.0、Node.js >=22.18.0、0 npm 依赖）。权威技术规范与安全边界完全由 [English](#english) 与 [日本語](#日本語) 章节规定。 |
 | 繁體中文 (Traditional Chinese) | `zh-Hant` | 預設離線的 GCP × Firebase 跨邊界攻擊路徑分析器、唯讀 MCP Airlock 以及選配的 AI 證據審查工具（Apache-2.0、Node.js >=22.18.0、0 npm 相依性）。正式技術規範與安全邊界完全由 [English](#english) 與 [日本語](#日本語) 章節規範。 |
 | 한국어 (Korean) | `ko` | 기본 오프라인으로 동작하는 GCP × Firebase 교차 경계 공격 경로 분석기, 읽기 전용 MCP Airlock 및 선택적 AI 증거 검토 도구입니다(Apache-2.0, Node.js >=22.18.0, npm 의존성 0개). 공식 기술 사양 및 보안 경계는 [English](#english) 및 [日本語](#日本語) 섹션에 따릅니다. |
@@ -53,11 +53,13 @@ flowchart LR
 
 ## English
 
-### Why Atlas Shield
+### Why atlas-GCP (Making External Consulting Firms Unnecessary)
 
-Isolated scanners can identify an exposed resource without connecting it to the identity and permissions that make the exposure consequential. Atlas Shield correlates supported evidence across GCP × Firebase boundaries: public Firebase Rules, Cloud Run exposure, GKE node identity exposure, Cloud SQL public networks (`0.0.0.0/0` or unencrypted public IPv4), or Workload Identity Federation (WIF) can form entry points into paths involving runtime or federated identities (including Compute Engine, App Engine, and Cloud Build default service accounts), IAM privilege escalation, and access to Secret Manager, BigQuery, Cloud SQL, or Cloud Storage. The graph distinguishes observed or statically established relationships from `potential` transitions that depend on application behavior or deployment context.
+Global technology and DX consulting firms (such as Slalom, Big 4, and traditional SI consultancies) typically charge tens of millions of yen (`¥10M–¥50M+`) over 3 to 6 months to assess enterprise cloud architectures, audit IAM and CI/CD trust boundaries, design AI guardrails, and produce a 30/60/90-day transformation roadmap. **By loading `atlas-GCP` into your company's existing AI agent, your internal staff can instantly build a dedicated in-house Cloud, DX, and AI Security Consulting AI in seconds for ¥0—making external consulting firms completely unnecessary.**
 
-With `--format blueprint --emit-patch`, any enterprise engineering team can feed this repository directly to their internal AI coding agent to generate an executive risk summary, a 30/60/90-day remediation roadmap, and review-only unified diffs offline in seconds—replacing multi-month external consulting assessments.
+Isolated scanners can identify an exposed resource without connecting it to the identity and permissions that make the exposure consequential. `atlas-GCP` correlates supported evidence across GCP × Firebase boundaries: public Firebase Rules, Cloud Run exposure, GKE node identity exposure, Cloud SQL public networks (`0.0.0.0/0` or unencrypted public IPv4), or Workload Identity Federation (WIF) can form entry points into paths involving runtime or federated identities (including Compute Engine, App Engine, and Cloud Build default service accounts), IAM privilege escalation, and access to Secret Manager, BigQuery, Cloud SQL, or Cloud Storage. The graph distinguishes observed or statically established relationships from `potential` transitions that depend on application behavior or deployment context.
+
+With `--format blueprint --emit-patch`, your internal AI coding agent automatically generates an executive risk summary, a 30/60/90-day remediation roadmap, and review-only unified diffs offline in seconds—replacing multi-month external consulting engagements with deterministic code and self-driving CI gates.
 
 AI SecOps adds another boundary: an assistant may receive hostile cloud logs or invoke tools with excessive privileges. The MCP Airlock mechanically restricts forwarded requests through fail-closed tool-name policies, while secret redaction and injection sanitization prepare untrusted telemetry for review. These controls have explicit limits; they do not establish that an upstream program is trustworthy or that every model instruction attack is neutralized.
 
@@ -66,11 +68,11 @@ AI SecOps adds another boundary: an assistant may receive hostile cloud logs or 
 Use this checkout with Node.js **>=22.18.0**; no install or build step is required:
 
 ```sh
-node bin/atlas-shield.mjs audit .
-node bin/atlas-shield.mjs audit /path/to/repository --format blueprint --emit-patch
-node bin/atlas-shield.mjs audit /path/to/repository --format sarif
-node bin/atlas-shield.mjs audit /path/to/repository --format json --emit-patch
-node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
+node bin/atlas-gcp.mjs audit .
+node bin/atlas-gcp.mjs audit /path/to/repository --format blueprint --emit-patch
+node bin/atlas-gcp.mjs audit /path/to/repository --format sarif
+node bin/atlas-gcp.mjs audit /path/to/repository --format json --emit-patch
+node bin/atlas-gcp.mjs audit fixtures/hardened-enterprise
 ```
 
 This checkout contains intentional vulnerable fixtures in `fixtures/vulnerable-enterprise`, so `audit .` exits `1`. The `audit fixtures/hardened-enterprise` command is the clean `0`-exit example.
@@ -78,7 +80,7 @@ This checkout contains intentional vulnerable fixtures in `fixtures/vulnerable-e
 npm package publication has **not been verified**. Once a trusted release is available on npm, the package entry point is:
 
 ```sh
-npx @atlas-sec/shield audit .
+npx @atlas-sec/gcp audit .
 ```
 
 Defaults are `--format table`, `--fail-on high`, and `--prover-mode gemini`. Formats are `table|json|sarif|blueprint`; failure thresholds are `blocker|high|medium`. Reports and proposed changes go to `stdout` only. `--format blueprint` emits a structured Markdown executive risk summary, a 30/60/90-day autonomous remediation roadmap, prioritized findings mapped to control domains, reachable cross-boundary attack paths, and review-only diffs when combined with `--emit-patch`. `--emit-patch` includes review-only unified diffs in the selected report format; it never applies them or modifies target files or cloud resources.
@@ -89,24 +91,25 @@ Defaults are `--format table`, `--fail-on high`, and `--prover-mode gemini`. For
 | `1` | Findings or paths meet the selected threshold, or the prover returns `BLOCKER`. |
 | `2` | Invalid arguments, an incomplete scan, prover `ERROR`, or proxy failure. Incomplete scans and prover errors take precedence over threshold findings. |
 
-### Autonomous Enterprise AI Playbook & 2-Hour Online Sprint
+### Instant In-House Consulting AI (Zero Consultants Needed) & Optional 2-Hour Sprint
 
-Enterprise staff can load this repository into their own company's AI agent (such as Gemini CLI, Antigravity, or Vertex AI) to execute a complete 4-step cloud & AI hardening loop internally for **¥0**, or optionally book a **2-Hour Online Implementation Sprint** (`¥100,000` in Japan / `$750` globally) for guided completion.
+When an enterprise representative loads **`atlas-GCP`** into their company's internal AI agent (such as Gemini CLI, Antigravity, or Vertex AI), that internal AI immediately acquires the methodology, cross-boundary graph engine, and remediation patterns of a top-tier cloud & AI consulting firm—**completely eliminating the need to hire external consultants like Slalom or Big 4 (`¥0` self-service)**. For teams that want live hands-on accompaniment after running the free scan, an optional **2-Hour Online Implementation Sprint** (`¥100,000` in Japan / `$750` globally) completes the entire rollout in a single 120-minute session.
 
-**Copy-Paste Prompt for Your In-House Enterprise AI Agent (`Tier 0 — ¥0`)**
+**Copy-Paste Prompt to Turn Your Company's AI into an Instant Consulting AI (`Tier 0 — ¥0`)**
 
 ```text
-Read ATLAS.md and README.md in this Atlas Shield repository, then execute the following 4 steps strictly in read-only / review-first mode against our target repository (<TARGET_REPO_PATH>):
-1. Run `node bin/atlas-shield.mjs mcp-config --client gemini` and present the read-only MCP Airlock wrapper configuration for our cloud/security tools.
-2. Run `node bin/atlas-shield.mjs audit <TARGET_REPO_PATH> --format blueprint --emit-patch` and present the Executive Risk Summary, the 30/60/90-Day Autonomous Remediation Roadmap, and all reachable cross-boundary attack paths.
+Read ATLAS.md and README.md in this atlas-GCP repository and act as our in-house Principal Cloud, DX & AI Security Consulting AI (replacing external consulting firms). Execute the following 4 steps strictly in read-only / review-first mode against our target repository (<TARGET_REPO_PATH>):
+1. Run `node bin/atlas-gcp.mjs mcp-config --client gemini` and present the read-only MCP Airlock wrapper configuration for our cloud/security tools.
+2. Run `node bin/atlas-gcp.mjs audit <TARGET_REPO_PATH> --format blueprint --emit-patch` and present the Executive Risk Summary, the 30/60/90-Day Autonomous Remediation Roadmap, and all reachable cross-boundary attack paths.
 3. Explain each review-only unified diff proposed by `--emit-patch` (Firebase Rules, Terraform Cloud Run/Cloud SQL/GKE, IAM least privilege, and GitHub Actions WIF pinning) and wait for human approval before applying any file edits.
-4. Prepare a pull-request CI workflow using `uses: ./` with `fail-on: high` so future regressions are blocked deterministically.
+4. Prepare a pull-request CI workflow using `uses: ./` with `fail-on: high` so future regressions are blocked deterministically without external consultants.
 ```
 
-| Tier | Cost | Target Audience & Scope | Cloud Credential Requirement |
+| Approach | Cost & Duration | How It Works | Cloud Credential Handover |
 | --- | --- | --- | --- |
-| **Tier 0: Free Self-Service (Apache-2.0)** | **¥0 / Free** | Organizations whose internal engineers and AI agents run the 4-step playbook, apply the review-only patches, and enable the CI gate independently. | **Zero** (100% offline local static & exported-telemetry analysis) |
-| **Tier 1: Optional 2-Hour Online Implementation Sprint** | **¥100,000 (JP) / $750 (Global)** | Teams that want rapid, guided execution after running the free scan: complete attack-path triage, MCP Airlock wiring, least-privilege patch verification, and CI gate rollout in a single 2-hour online session. | **Zero** (screen-share only the redacted `--format blueprint` Markdown output; no live cloud keys or production access ever handed over) |
+| **Traditional Consulting Firms (e.g., Slalom / Big 4)** | **¥10,000,000–¥50,000,000+**<br/>*(3–6 months)* | External consultants conduct manual interviews, review configs, and deliver static slide decks; know-how leaves when the contract ends. | Often requires IAM reader roles or NDA log exports |
+| **atlas-GCP Tier 0: Instant In-House Consulting AI (Apache-2.0)** | **¥0 / Free**<br/>*(Instant / Self-Service)* | Load `atlas-GCP` into your company's AI agent to run the 4-step consulting playbook, apply review-only patches, and enable the CI gate **with zero external consultants**. | **Zero** (100% offline local static & exported-telemetry analysis) |
+| **atlas-GCP Tier 1: Optional 2-Hour Online Implementation Sprint** | **¥100,000 (JP) / $750 (Global)**<br/>*(2 hours online)* | For teams that want guided completion after running the free scan: finish attack-path triage, MCP Airlock wiring, least-privilege patch verification, and CI gate rollout in one 2-hour online session. | **Zero** (screen-share only the redacted `--format blueprint` Markdown output; no live cloud keys or production access ever handed over) |
 
 **2-Hour Online Implementation Sprint Agenda (`Tier 1`)**
 
@@ -180,15 +183,15 @@ The Airlock proxies newline-delimited **stdio JSON-RPC 2.0**, filters tool names
 Configure your MCP client to launch the Airlock with a trusted upstream program. `sanitize` reads telemetry from standard input:
 
 ```sh
-node bin/atlas-shield.mjs airlock --profile scc --upstream-cmd /path/to/trusted-mcp-server
-node bin/atlas-shield.mjs sanitize < telemetry.txt
-node bin/atlas-shield.mjs mcp-config --profile scc --profile firebase --client gemini
-node bin/atlas-shield.mjs mcp-config --client agy
+node bin/atlas-gcp.mjs airlock --profile scc --upstream-cmd /path/to/trusted-mcp-server
+node bin/atlas-gcp.mjs sanitize < telemetry.txt
+node bin/atlas-gcp.mjs mcp-config --profile scc --profile firebase --client gemini
+node bin/atlas-gcp.mjs mcp-config --client agy
 ```
 
-Repeat `--upstream-arg` for each argument; use `--upstream-arg=<value>` for flags, for example `--upstream-arg=--flag`. Installed CLI forms are `atlas-shield airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]` and `atlas-shield mcp-config [--profile <name>...] [--client agy|gemini]`.
+Repeat `--upstream-arg` for each argument; use `--upstream-arg=<value>` for flags, for example `--upstream-arg=--flag`. Installed CLI forms are `atlas-gcp airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]` and `atlas-gcp mcp-config [--profile <name>...] [--client agy|gemini]`.
 
-`mcp-config` defaults to `gemini` and all seven profiles. Both clients receive `mcpServers` JSON on `stdout` only. This generator never runs or verifies upstream binaries, writes configuration files, or touches home directories. Generated wrappers expect `atlas-shield` on the client’s executable path. The `npx` templates use `--no-install` and preserve upstream flags as `--upstream-arg=<value>`.
+`mcp-config` defaults to `gemini` and all seven profiles. Both clients receive `mcpServers` JSON on `stdout` only. This generator never runs or verifies upstream binaries, writes configuration files, or touches home directories. Generated wrappers expect `atlas-gcp` on the client’s executable path. The `npx` templates use `--no-install` and preserve upstream flags as `--upstream-arg=<value>`.
 
 **Airlock profiles** — commands are templates from `src/airlock/profiles.ts` for caller-installed upstreams, not verified live integrations.
 
@@ -202,13 +205,13 @@ Repeat `--upstream-arg` for each argument; use `--upstream-arg=<value>` for flag
 | `prowler` | Prowler findings, checks, and compliance | `uvx prowler-mcp` | [Prowler MCP announcement](https://prowler.com/blog/prowler-launches-lighthouse-ai-and-mcp-server-bringing-autonomous-security-to-devsecops-teams) |
 | `semgrep` | Semgrep rules, findings, and configuration | `uvx semgrep-mcp` | [Semgrep MCP repository](https://github.com/semgrep/mcp) |
 
-**Security boundaries:** Atlas Shield has no HTTP MCP transport. HTTP-only services such as Google Developer Knowledge require a separately trusted stdio bridge; the template is not evidence of a working bridge. Live integrations are unverified. The caller must independently restrict and verify upstream binaries, arguments, and credentials. **Lexical tool-name filtering does not prove semantic read-only behavior**; profiles do not authenticate server identity. Sanitization is not a complete prompt-injection defense.
+**Security boundaries:** atlas-GCP has no HTTP MCP transport. HTTP-only services such as Google Developer Knowledge require a separately trusted stdio bridge; the template is not evidence of a working bridge. Live integrations are unverified. The caller must independently restrict and verify upstream binaries, arguments, and credentials. **Lexical tool-name filtering does not prove semantic read-only behavior**; profiles do not authenticate server identity. Sanitization is not a complete prompt-injection defense.
 
 ### L2: Optional Sovereign AI Prover
 
 ```sh
-node bin/atlas-shield.mjs audit . --prove --prover-mode gemini
-node bin/atlas-shield.mjs audit . --prove --prover-mode dual
+node bin/atlas-gcp.mjs audit . --prove --prover-mode gemini
+node bin/atlas-gcp.mjs audit . --prove --prover-mode dual
 ```
 
 **Pure Gemini Sovereign Mode** (`gemini`, the default) runs independent `argonArchitect` (`gemini-4-argon-high`) and `geminiRedTeam` (`gemini-4-hydrogen-xhigh`) passes through Gemini, Vertex AI, or the configured `agy` adapter. It requires no non-Google prover backend.
@@ -236,7 +239,7 @@ Proofs are **model-generated claims, not automatically executed exploits**. `PAS
 
 ### GitHub Actions & Verification
 
-The composite action requires Node.js **>=22.18.0**. This example runs from an Atlas Shield checkout using `uses: ./`; point `directory` at the checked-out target. It runs offline and preserves CLI exit codes. Inputs are `directory` (default `.`), `format` (default `table`), and `fail-on` (default `high`). Scanning this entire checkout includes the intentional vulnerable fixtures and therefore exits `1`.
+The composite action requires Node.js **>=22.18.0**. This example runs from an atlas-GCP checkout using `uses: ./`; point `directory` at the checked-out target. It runs offline and preserves CLI exit codes. Inputs are `directory` (default `.`), `format` (default `table`), and `fail-on` (default `high`). Scanning this entire checkout includes the intentional vulnerable fixtures and therefore exits `1`.
 
 ```yaml
 permissions:
@@ -271,11 +274,13 @@ Test files run sequentially so deterministic wall-clock parser budgets do not co
 
 ## 日本語
 
-### なぜ Atlas Shield か
+### なぜ atlas-GCP か（Slalom 等の外部コンサルを一瞬で不要にする）
 
-個別のスキャナーでは、公開されたリソースを検出できても、その影響を決める ID と権限のつながりを見落とす場合があります。Atlas Shield は、GCP × Firebase の境界をまたぐ対応済みの証拠を関連付けます。公開された Firebase Rules、Cloud Run、GKE ノード ID の露出、Cloud SQL の全公開ネットワーク（`0.0.0.0/0` または非暗号化公開 IPv4）、Workload Identity Federation（WIF）を入口として、実行 ID またはフェデレーション ID（Compute Engine、App Engine、Cloud Build の既定サービスアカウントを含む）、IAM 権限昇格、Secret Manager・BigQuery・Cloud SQL・Cloud Storage へのアクセスに至る経路を扱います。グラフでは、観測済みまたは静的に確認できた関係と、アプリケーションの動作やデプロイ環境に依存する `potential` な遷移を区別します。
+グローバルな DX・テクノロジーコンサルティングファーム（Slalom、Big 4、大手 SI コンサル等）にクラウド設計評価・IAM／WIF 統制・AI ガードレール設計・30/60/90日ロードマップ策定を依頼すると、通常 3〜6ヶ月で数千万円（¥1,000万〜¥5,000万円以上）の費用がかかります。**`atlas-GCP` を各企業の担当者が自社の AI エージェントに読み込ませるだけで、そうしたコンサル会社が提供する知見・横断検査・改修パッチ生成を備えた「自社専用の超一流 DX・クラウド・AI コンサル AI」を一瞬（数秒・¥0）で社内構築でき、外部コンサルティング会社を一切不要にします。**
 
-さらに `--format blueprint --emit-patch` を使うことで、各企業の担当者が本リポジトリを自社の AI コーディングエージェントに読み込ませ、経営・情シス向けのリスク要約、30/60/90日の自律改修ロードマップ、およびレビュー専用の修正 diff をオフラインかつ数秒で自動生成できます。これにより、従来数ヶ月を要した高額な外部コンサルティング診断を内製化できます。
+個別のスキャナーでは、公開されたリソースを検出できても、その影響を決める ID と権限のつながりを見落とす場合があります。`atlas-GCP` は、GCP × Firebase の境界をまたぐ対応済みの証拠を関連付けます。公開された Firebase Rules、Cloud Run、GKE ノード ID の露出、Cloud SQL の全公開ネットワーク（`0.0.0.0/0` または非暗号化公開 IPv4）、Workload Identity Federation（WIF）を入口として、実行 ID またはフェデレーション ID（Compute Engine、App Engine、Cloud Build の既定サービスアカウントを含む）、IAM 権限昇格、Secret Manager・BigQuery・Cloud SQL・Cloud Storage へのアクセスに至る経路を扱います。グラフでは、観測済みまたは静的に確認できた関係と、アプリケーションの動作やデプロイ環境に依存する `potential` な遷移を区別します。
+
+さらに `--format blueprint --emit-patch` を使うことで、自社の AI コーディングエージェントが経営・情シス向けのリスク要約、30/60/90日の自律改修ロードマップ、およびレビュー専用の修正 diff をオフラインかつ数秒で自動生成します。これにより、従来数ヶ月を要した高額な外部コンサルティング診断を、決定論的なコードと自走型 CI ゲートへ完全に置き換えます。
 
 AI SecOps には別の境界もあります。アシスタントは攻撃用の指示を含むクラウドログを受け取ったり、過剰な権限を持つツールを呼び出したりする可能性があります。MCP Airlock は、安全側に拒否するツール名ポリシーで転送要求を機械的に制限し、秘密情報の除去とインジェクションのサニタイズによって、信頼できないテレメトリーをレビュー可能な形にします。これらの制御には限界があり、上流プログラムの信頼性や、モデルへのあらゆる指示攻撃の無効化を証明するものではありません。
 
@@ -284,11 +289,11 @@ AI SecOps には別の境界もあります。アシスタントは攻撃用の�
 Node.js **>=22.18.0** で、この checkout から実行できます。インストール・ビルドは不要です。
 
 ```sh
-node bin/atlas-shield.mjs audit .
-node bin/atlas-shield.mjs audit /path/to/repository --format blueprint --emit-patch
-node bin/atlas-shield.mjs audit /path/to/repository --format sarif
-node bin/atlas-shield.mjs audit /path/to/repository --format json --emit-patch
-node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
+node bin/atlas-gcp.mjs audit .
+node bin/atlas-gcp.mjs audit /path/to/repository --format blueprint --emit-patch
+node bin/atlas-gcp.mjs audit /path/to/repository --format sarif
+node bin/atlas-gcp.mjs audit /path/to/repository --format json --emit-patch
+node bin/atlas-gcp.mjs audit fixtures/hardened-enterprise
 ```
 
 この checkout には `fixtures/vulnerable-enterprise` に意図的な脆弱性を持つ fixture があるため、`audit .` は終了コード `1` を返します。`audit fixtures/hardened-enterprise` が終了コード `0` の正常例です。
@@ -296,7 +301,7 @@ node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
 npm パッケージの公開状況は**未確認**です。信頼できるリリースが npm で提供された場合の実行形式は次のとおりです。
 
 ```sh
-npx @atlas-sec/shield audit .
+npx @atlas-sec/gcp audit .
 ```
 
 既定値は `--format table`、`--fail-on high`、`--prover-mode gemini` です。出力形式は `table|json|sarif|blueprint`、失敗とする重大度のしきい値は `blocker|high|medium` から選択します。レポートと変更案は `stdout`（標準出力）のみに出力します。`--format blueprint` は、経営・情シス向けリスク要約、30/60/90日の自律改修ロードマップ、統制ドメイン別の優先指摘一覧、到達可能なクロス境界攻撃経路、および `--emit-patch` 併用時のレビュー専用 diff を構造化 Markdown として出力します。`--emit-patch` は選択した形式のレポートにレビュー専用の unified diff を含めますが、適用は行わず、対象ファイルやクラウドリソースを変更しません。
@@ -307,24 +312,25 @@ npx @atlas-sec/shield audit .
 | `1` | 指定しきい値以上の指摘または経路がある、または Prover が `BLOCKER` を返した。 |
 | `2` | 引数不正、不完全な走査、Prover の `ERROR`、またはプロキシ障害。不完全な走査と Prover のエラーは、しきい値以上の指摘より優先される。 |
 
-### 自社AIによる自律導入プレイブックと2時間オンライン実装スプリント
+### コンサル不要：Slalom等の外部コンサルAIを自社AIで一瞬で構築する自律導入スキームと2時間オンラインスプリント
 
-各企業の担当者は、本リポジトリを自社の AI エージェント（Gemini CLI、Antigravity、Vertex AI 等）に読み込ませることで、**完全無料（¥0）**で4ステップの内製強化ループを完結できます。また、無料スキャン実行後にプロと伴走して一気に定着させたい企業向けに、任意の**2時間オンライン実装スプリント**（日本：`¥100,000`／海外：`$750`）も提供します。
+各企業の担当者は、この **`atlas-GCP`** リポジトリを自社の AI エージェント（Gemini CLI、Antigravity、Vertex AI 等）に読み込ませるだけで、**Slalom や Big 4 等の高額な DX・クラウドコンサルティングファームを雇うことなく、自社専用の「超一流コンサル AI」を一瞬で構築し、完全無料（¥0）で内製強化を完結**できます。さらに、無料スキャン実行後にプロと伴走してその場で一気に定着させたい企業向けに、任意の**2時間オンライン実装スプリント**（日本：`¥100,000`／海外：`$750`）も提供します。
 
-**自社AIエージェントへのコピペ用プロンプト（`Tier 0 — ¥0 完全自走`）**
+**自社AIを一瞬で「社内専属コンサルAI」に変えるコピペ用プロンプト（`Tier 0 — ¥0 完全自走・コンサル不要`）**
 
 ```text
-この Atlas Shield リポジトリの ATLAS.md と README.md を読み込み、自社の対象リポジトリ（<TARGET_REPO_PATH>）に対して、必ず読み取り専用・レビュー優先モードで以下の4ステップを実行してください。
-1. `node bin/atlas-shield.mjs mcp-config --client gemini` を実行し、社内クラウド／セキュリティツール向けの読み取り専用 MCP Airlock ラッパー設定を提示すること。
-2. `node bin/atlas-shield.mjs audit <TARGET_REPO_PATH> --format blueprint --emit-patch` を実行し、Executive Risk Summary（経営・情シス要約）、30/60/90日の自律改修ロードマップ、および到達可能なすべてのクロス境界攻撃経路を提示すること。
+この atlas-GCP リポジトリの ATLAS.md と README.md を読み込み、当社の「社内専属プリンシパル DX・クラウド・AI セキュリティコンサル AI」（外部コンサルファーム代替）として振る舞ってください。自社の対象リポジトリ（<TARGET_REPO_PATH>）に対して、必ず読み取り専用・レビュー優先モードで以下の4ステップを実行してください。
+1. `node bin/atlas-gcp.mjs mcp-config --client gemini` を実行し、社内クラウド／セキュリティツール向けの読み取り専用 MCP Airlock ラッパー設定を提示すること。
+2. `node bin/atlas-gcp.mjs audit <TARGET_REPO_PATH> --format blueprint --emit-patch` を実行し、Executive Risk Summary（経営・情シス要約）、30/60/90日の自律改修ロードマップ、および到達可能なすべてのクロス境界攻撃経路を提示すること。
 3. `--emit-patch` が提案したレビュー専用の unified diff（Firebase Rules、Terraform Cloud Run/Cloud SQL/GKE、IAM 最小権限化、GitHub Actions WIF リポジトリ固定）を1件ずつ解説し、人間の承認を得るまでファイル変更を適用しないこと。
-4. 今後の設定退行を決定論的にブロックするため、`uses: ./`（`fail-on: high`）を用いた Pull Request CI ワークフロー案を作成すること。
+4. 外部コンサルに一切依存せず今後の設定退行を決定論的にブロックするため、`uses: ./`（`fail-on: high`）を用いた Pull Request CI ワークフロー案を作成すること。
 ```
 
-| プラン | 料金 | 対象・導入範囲 | クラウド認証情報の引き渡し |
+| 導入形態 | 費用・期間 | 仕組み・特徴 | クラウド認証情報の引き渡し |
 | --- | --- | --- | --- |
-| **Tier 0: 完全自走コース（Apache-2.0）** | **¥0（完全無料）** | 社内のエンジニアと自社 AI エージェントで4ステップのプレイブックを実行し、修正パッチ適用から CI ゲート導入までを自走するすべての企業。 | **一切不要**（100% オフラインのローカル静的・エクスポート済みテレメトリー解析） |
-| **Tier 1: 2時間オンライン実装スプリント（任意）** | **¥100,000（日本）／ $750（海外）** | 無料スキャン実行後、プロと伴走して2時間で攻撃経路の優先度確定・MCP Airlock 接続・最小権限パッチ確認・CI ゲート稼働までを一気に完了させたい企業。 | **一切不要**（秘密情報マスク済みの `--format blueprint` Markdown 出力のみを画面共有。本番アクセス権や鍵の預託はゼロ） |
+| **従来の外部コンサルファーム（Slalom / Big 4 等）** | **¥10,000,000〜¥50,000,000+**<br/>*（3〜6ヶ月）* | 外部コンサルタントがヒアリング・設定確認・スライド作成を手作業で実施。契約終了とともに知見が流出。 | IAM 閲覧権限の付与やログ提出が必要な場合あり |
+| **atlas-GCP Tier 0: 自社コンサルAI即時構築（Apache-2.0）** | **¥0（完全無料）**<br/>*（即日・数秒で構築）* | `atlas-GCP` を自社 AI に読み込ませて「社内専属コンサル AI」を一瞬で構築。4ステップの診断・修正 diff 適用・CI ゲート化まで**外部コンサル不要で完全自走**。 | **一切不要**（100% オフラインのローカル静的・エクスポート済みテレメトリー解析） |
+| **atlas-GCP Tier 1: 2時間オンライン実装スプリント（任意）** | **¥100,000（日本）／ $750（海外）**<br/>*（オンライン2時間完結）* | 無料スキャン実行後、プロと伴走して2時間で攻撃経路の優先度確定・MCP Airlock 接続・最小権限パッチ確認・CI ゲート稼働までを一気に完了させたい企業向け。 | **一切不要**（秘密情報マスク済みの `--format blueprint` Markdown 出力のみを画面共有。本番アクセス権や鍵の預託はゼロ） |
 
 **2時間オンライン実装スプリント Timebox アジェンダ（`Tier 1`）**
 
@@ -398,15 +404,15 @@ Airlock は改行区切りの **stdio JSON-RPC 2.0** を仲介し、安全側に
 信頼できる上流プログラムを指定して Airlock を起動するよう、MCP クライアントを設定します。`sanitize` は標準入力からテレメトリーを読み込みます。
 
 ```sh
-node bin/atlas-shield.mjs airlock --profile scc --upstream-cmd /path/to/trusted-mcp-server
-node bin/atlas-shield.mjs sanitize < telemetry.txt
-node bin/atlas-shield.mjs mcp-config --profile scc --profile firebase --client gemini
-node bin/atlas-shield.mjs mcp-config --client agy
+node bin/atlas-gcp.mjs airlock --profile scc --upstream-cmd /path/to/trusted-mcp-server
+node bin/atlas-gcp.mjs sanitize < telemetry.txt
+node bin/atlas-gcp.mjs mcp-config --profile scc --profile firebase --client gemini
+node bin/atlas-gcp.mjs mcp-config --client agy
 ```
 
-引数ごとに `--upstream-arg` を繰り返します。フラグには `--upstream-arg=<value>` 形式を使い、例えば `--upstream-arg=--flag` と記述します。インストール済み CLI の形式は `atlas-shield airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]` と `atlas-shield mcp-config [--profile <name>...] [--client agy|gemini]` です。
+引数ごとに `--upstream-arg` を繰り返します。フラグには `--upstream-arg=<value>` 形式を使い、例えば `--upstream-arg=--flag` と記述します。インストール済み CLI の形式は `atlas-gcp airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]` と `atlas-gcp mcp-config [--profile <name>...] [--client agy|gemini]` です。
 
-`mcp-config` の既定クライアントは `gemini`、既定の対象は全 7 プロファイルです。どちらのクライアントにも `mcpServers` JSON を `stdout` のみに出力します。この生成処理は上流バイナリーの実行・検証、設定ファイルへの書き込み、ホームディレクトリへの変更を行いません。生成したラッパーは、クライアントの実行可能ファイル検索パスに `atlas-shield` があることを前提とします。`npx` テンプレートは `--no-install` を使い、上流のフラグを `--upstream-arg=<value>` として保持します。
+`mcp-config` の既定クライアントは `gemini`、既定の対象は全 7 プロファイルです。どちらのクライアントにも `mcpServers` JSON を `stdout` のみに出力します。この生成処理は上流バイナリーの実行・検証、設定ファイルへの書き込み、ホームディレクトリへの変更を行いません。生成したラッパーは、クライアントの実行可能ファイル検索パスに `atlas-gcp` があることを前提とします。`npx` テンプレートは `--no-install` を使い、上流のフラグを `--upstream-arg=<value>` として保持します。
 
 **Airlock プロファイル** — コマンドは `src/airlock/profiles.ts` にある利用者導入済み上流用のテンプレートであり、実接続を検証済みという意味ではありません。
 
@@ -420,13 +426,13 @@ node bin/atlas-shield.mjs mcp-config --client agy
 | `prowler` | Prowler の findings・チェック・コンプライアンス | `uvx prowler-mcp` | [Prowler MCP 発表](https://prowler.com/blog/prowler-launches-lighthouse-ai-and-mcp-server-bringing-autonomous-security-to-devsecops-teams) |
 | `semgrep` | Semgrep のルール・findings・設定 | `uvx semgrep-mcp` | [Semgrep MCP リポジトリ](https://github.com/semgrep/mcp) |
 
-**セキュリティ境界:** Atlas Shield は HTTP MCP トランスポートを備えていません。Google Developer Knowledge のような HTTP 専用サービスには、別途信頼性を確認した stdio ブリッジが必要です。テンプレートはブリッジの動作を示す証拠ではありません。実接続は未検証です。上流バイナリー・引数・認証情報の制限と検証は利用者の責任です。**ツール名の字句的なフィルタリングでは、意味的な読み取り専用動作を証明できません**。プロファイルはサーバーの身元を認証しません。サニタイズもプロンプトインジェクションに対する完全な防御ではありません。
+**セキュリティ境界:** atlas-GCP は HTTP MCP トランスポートを備えていません。Google Developer Knowledge のような HTTP 専用サービスには、別途信頼性を確認した stdio ブリッジが必要です。テンプレートはブリッジの動作を示す証拠ではありません。実接続は未検証です。上流バイナリー・引数・認証情報の制限と検証は利用者の責任です。**ツール名の字句的なフィルタリングでは、意味的な読み取り専用動作を証明できません**。プロファイルはサーバーの身元を認証しません。サニタイズもプロンプトインジェクションに対する完全な防御ではありません。
 
 ### L2: 任意の Sovereign AI Prover
 
 ```sh
-node bin/atlas-shield.mjs audit . --prove --prover-mode gemini
-node bin/atlas-shield.mjs audit . --prove --prover-mode dual
+node bin/atlas-gcp.mjs audit . --prove --prover-mode gemini
+node bin/atlas-gcp.mjs audit . --prove --prover-mode dual
 ```
 
 **Pure Gemini Sovereign Mode**（既定の `gemini`）は、`gemini-4-argon-high` による `argonArchitect` と `gemini-4-hydrogen-xhigh` による `geminiRedTeam` の独立した検証を、Gemini、Vertex AI、または設定した `agy` アダプターで実行します。Google 以外の Prover バックエンドは必要ありません。
@@ -454,7 +460,7 @@ node bin/atlas-shield.mjs audit . --prove --prover-mode dual
 
 ### GitHub Actions とローカル検証
 
-Composite action には Node.js **>=22.18.0** が必要です。次の例は Atlas Shield の checkout 内から `uses: ./` を使います。`directory` には checkout 済みの対象を指定してください。オフラインで実行し、CLI の終了コードを保持します。入力は `directory`（既定 `.`）、`format`（既定 `table`）、`fail-on`（既定 `high`）です。この checkout 全体を走査すると意図的な脆弱性 fixture を含むため、終了コード `1` になります。
+Composite action には Node.js **>=22.18.0** が必要です。次の例は atlas-GCP の checkout 内から `uses: ./` を使います。`directory` には checkout 済みの対象を指定してください。オフラインで実行し、CLI の終了コードを保持します。入力は `directory`（既定 `.`）、`format`（既定 `table`）、`fail-on`（既定 `high`）です。この checkout 全体を走査すると意図的な脆弱性 fixture を含むため、終了コード `1` になります。
 
 ```yaml
 permissions:

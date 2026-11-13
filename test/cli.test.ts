@@ -13,7 +13,7 @@ const vulnerable = join(root, 'fixtures/vulnerable-enterprise');
 const hardened = join(root, 'fixtures/hardened-enterprise');
 
 test('remediation safely skips symlinks and oversized files while preserving inputs', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-safe-diff-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-safe-diff-'));
   const source = 'service cloud.firestore { match /a { allow get; } }\n';
   try {
     const sources = new Map([
@@ -43,7 +43,7 @@ test('remediation never blocks on FIFOs and rejects growth after descriptor insp
     import { syncBuiltinESMExports } from 'node:module';
     import { tmpdir } from 'node:os';
     import { join } from 'node:path';
-    const directory = fs.mkdtempSync(join(tmpdir(), 'atlas-shield-fd-'));
+    const directory = fs.mkdtempSync(join(tmpdir(), 'atlas-gcp-fd-'));
     const file = 'input.sample', target = join(directory, file);
     const source = 'service cloud.firestore { match /a { allow get; } }\\n';
     const { parseFirebaseRules } = await import(${JSON.stringify(new URL('../src/graph/firebase-rules-parser.ts', import.meta.url).href)});
@@ -96,7 +96,7 @@ test('remediation never blocks on FIFOs and rejects growth after descriptor insp
 });
 
 test('remediation diffs exclude C1 and carriage-return controls in source lines and paths', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-diff-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-diff-'));
   try {
     for (const control of ['\u0080', '\u009b', '\u009f', '\r', '\r\n']) {
       const file = 'controls.firestore.rules.sample';
@@ -121,7 +121,7 @@ test('remediation diffs exclude C1 and carriage-return controls in source lines 
 });
 
 test('remediation retains harmless Unicode escapes but suppresses escaped secrets', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-diff-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-diff-'));
   const file = 'escaped.firestore.rules.sample';
   try {
     for (const comment of ['"\\u0041"', '"ya29.\\u200bsecret-oauth-token"']) {
@@ -140,7 +140,7 @@ test('remediation retains harmless Unicode escapes but suppresses escaped secret
 });
 
 function cli(args: string[], input = '') {
-  const result = spawnSync(process.execPath, [join(root, 'bin/atlas-shield.mjs'), ...args], {
+  const result = spawnSync(process.execPath, [join(root, 'bin/atlas-gcp.mjs'), ...args], {
     cwd: root, input, encoding: 'utf8', timeout: 10_000, maxBuffer: 1024 * 1024,
     env: { PATH: process.env.PATH, LANG: 'C' },
   });
@@ -160,7 +160,7 @@ test('CLI audits return 0 for hardened inputs and 1 for vulnerable inputs', () =
 });
 
 test('CLI ignores unrelated IAM substrings while recognized IAM filenames still fail closed', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-cli-iam-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-cli-iam-'));
   try {
     for (const file of ['diamond.json', 'parliament.json', 'mediamap.json', 'william.json']) {
       writeFileSync(join(directory, file), '{}');
@@ -179,7 +179,7 @@ test('CLI ignores unrelated IAM substrings while recognized IAM filenames still 
 });
 
 test('CLI reports bounded Firebase traversal and oversized IAM resources as incomplete scans', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-cli-limits-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-cli-limits-'));
   try {
     writeFileSync(join(directory, 'deep.firestore.rules.sample'), 'service cloud.firestore { '
       + 'match /a{allow get;'.repeat(25_000) + '}'.repeat(25_001));
@@ -208,7 +208,7 @@ test('CLI rejects unsupported real Node versions before importing TypeScript wit
     const supported = version === '22.18.0' || version === '23.0.0';
     const loader = 'data:text/javascript,' + encodeURIComponent(
       `Object.defineProperty(process.versions, 'node', { value: ${JSON.stringify(version)} });`);
-    const result = spawnSync(process.execPath, ['--import', loader, join(root, 'bin/atlas-shield.mjs'),
+    const result = spawnSync(process.execPath, ['--import', loader, join(root, 'bin/atlas-gcp.mjs'),
       'audit', supported ? hardened : '.'], {
       cwd: root, encoding: 'utf8', timeout: 10_000, maxBuffer: 16_384,
       env: { PATH: process.env.PATH, LANG: 'C', ATLAS_TEST_NODE_VERSION: supported ? '20.11.0' : '99.0.0' },
@@ -219,7 +219,7 @@ test('CLI rejects unsupported real Node versions before importing TypeScript wit
     if (supported) assert.match(result.stdout, /No findings/);
     else {
       assert.equal(result.stdout, '');
-      assert.equal(result.stderr, 'Atlas Shield: Node.js >=22.18.0 is required.\n');
+      assert.equal(result.stderr, 'atlas-GCP: Node.js >=22.18.0 is required.\n');
     }
   }
 });
@@ -229,7 +229,7 @@ test('invalid commands and options return 2 without a report', () => {
     ['audit', hardened, '--fail-on', 'low'], ['audit', hardened, '--prover-mode', 'unknown']]) {
     const result = cli(args);
     assert.equal(result.status, 2, args.join(' '));
-    assert.match(result.stderr, /Atlas Shield:/);
+    assert.match(result.stderr, /atlas-GCP:/);
     assert.equal(result.stdout, '');
   }
 });
@@ -283,7 +283,7 @@ test('sanitize quarantines JSON object keys and preserves healthy evidence', () 
 });
 
 test('CLI imports tolerate missing or absent argv paths and symlink invocations still run', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-cli-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-cli-'));
   try {
     for (const entry of [join(directory, 'does-not-exist'), undefined, '-']) {
       const result = spawnSync(process.execPath, ['--input-type=module', '-e',
@@ -294,8 +294,8 @@ test('CLI imports tolerate missing or absent argv paths and symlink invocations 
       assert.equal(result.stdout, '');
       assert.equal(result.stderr, '');
     }
-    for (const target of ['bin/atlas-shield.mjs', 'src/cli.ts']) {
-      const link = join(directory, target.startsWith('bin') ? 'shield.mjs' : 'shield.ts');
+    for (const target of ['bin/atlas-gcp.mjs', 'src/cli.ts']) {
+      const link = join(directory, target.startsWith('bin') ? 'gcp.mjs' : 'gcp.ts');
       symlinkSync(join(root, target), link);
       const result = spawnSync(process.execPath, [link, '--version'], { encoding: 'utf8', timeout: 10_000,
         env: { PATH: process.env.PATH, LANG: 'C' } });
@@ -309,7 +309,7 @@ test('CLI imports tolerate missing or absent argv paths and symlink invocations 
 });
 
 test('JSON and SARIF retain two-space indentation and final newline after redaction', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-report-'));
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-gcp-report-'));
   const token = 'ya29.synthetic-report-token';
   try {
     writeFileSync(join(directory, 'iam-policy.json'), JSON.stringify({ resource: `projects/${token}`,
@@ -336,14 +336,14 @@ test('package explicitly includes only distribution files and action run uses an
   const runBlocks = [...action.matchAll(/^([ \t]*)run:[^\n]*\n((?:\1[ \t]+[^\n]*\n?)*)/gm)];
   assert.ok(runBlocks.length > 0);
   for (const block of runBlocks) assert.equal(block[0].includes('${{'), false);
-  assert.match(runBlocks[0][0], /node "\$GITHUB_ACTION_PATH\/bin\/atlas-shield\.mjs" audit/);
+  assert.match(runBlocks[0][0], /node "\$GITHUB_ACTION_PATH\/bin\/atlas-gcp\.mjs" audit/);
   assert.match(runBlocks[0][0], /--format="\$ATLAS_FORMAT" --fail-on="\$ATLAS_FAIL_ON" -- "\$ATLAS_DIRECTORY"/);
 });
 
 test('--format blueprint emits executive roadmap, control domains, diffs and execution tiers', () => {
   const clean = cli(['audit', hardened, '--format', 'blueprint']);
   assert.equal(clean.status, 0, clean.stderr);
-  assert.match(clean.stdout, /# Atlas Shield — Autonomous Security & DX Blueprint/);
+  assert.match(clean.stdout, /# atlas-GCP — Autonomous Cloud\/DX\/AI Consulting & Security Blueprint/);
   assert.match(clean.stdout, /No findings in the analyzed inputs/);
 
   const unsafe = cli(['audit', vulnerable, '--format', 'blueprint', '--emit-patch']);
@@ -354,6 +354,6 @@ test('--format blueprint emits executive roadmap, control domains, diffs and exe
   assert.match(unsafe.stdout, /## 4\. Reachable Cross-Boundary Attack Paths/);
   assert.match(unsafe.stdout, /## 5\. Review-Only Remediation Proposals/);
   assert.match(unsafe.stdout, /```diff/);
-  assert.match(unsafe.stdout, /Tier 0 — Free Self-Service/);
+  assert.match(unsafe.stdout, /Tier 0 — Instant In-House Consulting AI/);
   assert.match(unsafe.stdout, /Tier 1 — Optional 2-Hour Online Implementation Sprint/);
 });

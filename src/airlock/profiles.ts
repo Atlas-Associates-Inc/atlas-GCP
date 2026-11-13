@@ -68,10 +68,10 @@ export function buildMcpConfig(options: { profiles?: readonly AirlockProfileId[]
   for (const id of selected) {
     const profile = getAirlockProfile(id);
     if (!profile) throw new Error('Unknown airlock profile.');
-    const key = `atlas-shield-${profile.id}`;
+    const key = `atlas-gcp-${profile.id}`;
     if (Object.hasOwn(mcpServers, key)) continue;
     mcpServers[key] = {
-      command: 'atlas-shield',
+      command: 'atlas-gcp',
       args: ['airlock', '--profile', profile.id, '--upstream-cmd', profile.upstreamCommand,
         ...profile.upstreamArgs.map(arg => `--upstream-arg=${arg}`)],
     };

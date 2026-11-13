@@ -1,11 +1,11 @@
 {
-  "name": "@atlas-sec/shield",
+  "name": "@atlas-sec/gcp",
   "version": "0.3.0",
-  "description": "Offline GCP and Firebase attack graph analysis with a read-only MCP airlock",
+  "description": "Autonomous GCP and Firebase consulting AI engine: offline attack-graph analysis, 30/60/90-day blueprints, and read-only MCP airlock",
   "license": "Apache-2.0",
   "type": "module",
   "engines": { "node": ">=22.18.0" },
-  "bin": { "atlas-shield": "./bin/atlas-shield.mjs" },
+  "bin": { "atlas-gcp": "./bin/atlas-gcp.mjs" },
   "files": ["bin/", "src/", "LICENSE", "README.md", "action.yml"],
   "scripts": {
     "check": "node src/cli.ts --help",

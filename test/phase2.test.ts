@@ -63,7 +63,7 @@ test('OSS governance documents are bilingual, safe UTF-8 files and preserve repo
   const bidiOrZeroWidth = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/;
   const hasUnsupportedModelToken = (text: string): boolean => {
     const stripped = text.replace(/(?<!-)\bgemini(?:-3\.8-flash-high|\s+3\.8\s+flash\s+high)\b(?!-)/gi, '');
-    return /\b(?:claude|anthropic|fable|opus|sonnet|haiku|nano|mini|lite|flash|argon-(?:low|medium))\b/i.test(stripped);
+    return /\b(?:claude|anthropic|fable|opus|sonnet|haiku|nano|mini|lite|flash|argon-(?:low|medium)|carbon-low)\b/i.test(stripped);
   };
   for (const file of ['SECURITY.md', 'CONTRIBUTING.md', 'README.md']) {
     const path = join(root, file);
@@ -96,8 +96,8 @@ test('OSS governance documents are bilingual, safe UTF-8 files and preserve repo
       }
     }
   }
-  assert.equal(hasUnsupportedModelToken('Approved: Gemini 3.8 Flash High, gemini-3.8-flash-high, gemini-4-argon-high, gpt-6-astra.'), false);
-  for (const token of ['flash', 'gemini-3.8-flash', 'flash-lite', 'flash-low', 'flash-medium', 'gemini-3.8-flash-high-lite', 'claude-gemini-3.8-flash-high', 'lite', 'mini', 'nano', 'argon-low', 'argon-medium', 'claude', 'anthropic', 'fable', 'opus', 'sonnet', 'haiku']) {
+  assert.equal(hasUnsupportedModelToken('Approved: Gemini 3.8 Flash High, gemini-3.8-flash-high, gemini-4-argon-high, gemini-4-carbon-high, gemini-4-hydrogen-xhigh, gpt-6-astra.'), false);
+  for (const token of ['flash', 'gemini-3.8-flash', 'flash-lite', 'flash-low', 'flash-medium', 'gemini-3.8-flash-high-lite', 'claude-gemini-3.8-flash-high', 'lite', 'mini', 'nano', 'argon-low', 'argon-medium', 'carbon-low', 'claude', 'anthropic', 'fable', 'opus', 'sonnet', 'haiku']) {
     assert.equal(hasUnsupportedModelToken(token), true, token);
   }
   const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));

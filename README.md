@@ -178,7 +178,7 @@ node bin/atlas-shield.mjs audit . --prove --prover-mode gemini
 node bin/atlas-shield.mjs audit . --prove --prover-mode dual
 ```
 
-**Pure Gemini Sovereign Mode** (`gemini`, the default) runs independent `argonArchitect` and `geminiRedTeam` passes on `gemini-4-argon-high` through Gemini, Vertex AI, or the configured `agy` adapter. It requires no non-Google prover backend.
+**Pure Gemini Sovereign Mode** (`gemini`, the default) runs independent `argonArchitect` (`gemini-4-argon-high`) and `geminiRedTeam` (`gemini-4-hydrogen-xhigh`) passes through Gemini, Vertex AI, or the configured `agy` adapter. It requires no non-Google prover backend.
 
 `dual` runs `argonHigh` on `gemini-4-argon-high` plus `astraUltra` through an installed, authenticated `codex` CLI with `gpt-6-astra`, ultra reasoning, a read-only sandbox, and an ephemeral session. The adapter forwards `CODEX_HOME` and `OPENAI_API_KEY` when set. Both modes pass identical sanitized evidence to their lanes without sharing responses across lanes.
 
@@ -363,7 +363,7 @@ node bin/atlas-shield.mjs audit . --prove --prover-mode gemini
 node bin/atlas-shield.mjs audit . --prove --prover-mode dual
 ```
 
-**Pure Gemini Sovereign Mode**（既定の `gemini`）は、`gemini-4-argon-high` による独立した `argonArchitect` と `geminiRedTeam` の検証を、Gemini、Vertex AI、または設定した `agy` アダプターで実行します。Google 以外の Prover バックエンドは必要ありません。
+**Pure Gemini Sovereign Mode**（既定の `gemini`）は、`gemini-4-argon-high` による `argonArchitect` と `gemini-4-hydrogen-xhigh` による `geminiRedTeam` の独立した検証を、Gemini、Vertex AI、または設定した `agy` アダプターで実行します。Google 以外の Prover バックエンドは必要ありません。
 
 `dual` は、`gemini-4-argon-high` による `argonHigh` と、導入・認証済みの `codex` CLI による `astraUltra` を実行します。後者は `gpt-6-astra`、ultra 推論、読み取り専用 sandbox、一時セッションを使用します。アダプターは、設定されていれば `CODEX_HOME` と `OPENAI_API_KEY` を引き継ぎます。どちらのモードも各系統に同一のサニタイズ済み証拠を渡し、系統間で回答を共有しません。
 

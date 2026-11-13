@@ -21,7 +21,8 @@ export interface ProverOptions {
   timeoutMs?: number;
 }
 
-const GOOGLE_MODEL = 'gemini-4-argon-high';
+const ARGON_MODEL = 'gemini-4-argon-high';
+const HYDROGEN_RED_TEAM_MODEL = 'gemini-4-hydrogen-xhigh';
 const ASTRA_MODEL = 'gpt-6-astra';
 const MAX_INPUT_BYTES = 256 * 1024;
 const MAX_RESPONSE_BYTES = 128 * 1024;
@@ -44,10 +45,14 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function googleModelForLane(lane: ProverLane): string {
+  return lane === 'geminiRedTeam' ? HYDROGEN_RED_TEAM_MODEL : ARGON_MODEL;
+}
+
 function laneMetadata(lane: ProverLane): Pick<LaneVerdict, 'family' | 'model'> {
   return lane === 'astraUltra'
     ? { family: 'openai', model: ASTRA_MODEL }
-    : { family: 'google', model: GOOGLE_MODEL };
+    : { family: 'google', model: googleModelForLane(lane) };
 }
 
 function errorVerdict(lane: ProverLane, rationale: string): LaneVerdict {
@@ -162,11 +167,12 @@ function requiredEnvironment(name: string): string {
 }
 
 async function googleRest(prompt: string, context: ProverContext, backend: 'gemini' | 'vertex'): Promise<string> {
+  const model = googleModelForLane(context.lane);
   let endpoint: URL;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (backend === 'gemini') {
     headers['x-goog-api-key'] = requiredEnvironment('GEMINI_API_KEY');
-    endpoint = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_MODEL}:generateContent`);
+    endpoint = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
   } else {
     const project = requiredEnvironment('GOOGLE_CLOUD_PROJECT');
     const location = requiredEnvironment('GOOGLE_CLOUD_LOCATION');
@@ -175,7 +181,7 @@ async function googleRest(prompt: string, context: ProverContext, backend: 'gemi
       throw new Error('Vertex project or location configuration is invalid.');
     }
     const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
-    endpoint = new URL(`https://${host}/v1/projects/${project}/locations/${location}/publishers/google/models/${GOOGLE_MODEL}:generateContent`);
+    endpoint = new URL(`https://${host}/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`);
     headers.Authorization = `Bearer ${requiredEnvironment('GOOGLE_OAUTH_ACCESS_TOKEN')}`;
   }
   // No caller-controlled endpoint, redirects, tools, or automatic provider fallback.
@@ -298,7 +304,7 @@ async function defaultRunner(prompt: string, context: ProverContext): Promise<un
       writeFileSync(promptPath, prompt, { mode: 0o600, flag: 'wx' });
       writeFileSync(schemaPath, JSON.stringify(verdictSchema), { mode: 0o600, flag: 'wx' });
       const raw = await subprocess('agy', [
-        '--mode', 'plan', '--model', GOOGLE_MODEL, '--sandbox', '--add-dir', directory,
+        '--mode', 'plan', '--model', googleModelForLane(context.lane), '--sandbox', '--add-dir', directory,
         '--output-format', 'json', '--json-schema', schemaPath,
         '-p', `Read the prover input at ${JSON.stringify(promptPath)} and return the JSON verdict matching the schema.`,
       ], '', context.signal);

@@ -188,6 +188,15 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
   - **Do Not**: Mutate files outside scope, modify test files or budgets, alter git metadata, or introduce dependencies.
   - **Local Verification**: Deterministic acceptance gates (`npm run check` and `npm test`) verified clean by `atlas-implement`; independent Google clean-room audit (Argon High) remains pending.
 
+- [x] **Task-18: L2 Sovereign Prover Orthogonal Gemini 4 Upgrade (`Argon High` × `Hydrogen XHigh`) & 4-Model Governance Alignment**
+  - **Target Files**: `src/prove/dual-prover.ts`, `ATLAS.md`, `README.md`, `test/prover.test.ts`, `test/phase2.test.ts`, `TASK_PLAN.md`.
+  - **Scope**:
+    - Upgrade `geminiRedTeam` lane in `src/prove/dual-prover.ts` to `gemini-4-hydrogen-xhigh` while keeping `argonArchitect` and `argonHigh` on `gemini-4-argon-high` across Gemini REST, Vertex AI REST, and `agy` CLI adapters.
+    - Synchronize `ATLAS.md` and `README.md` (EN/JA) to document the orthogonal `argonArchitect` (`gemini-4-argon-high`) × `geminiRedTeam` (`gemini-4-hydrogen-xhigh`) Pure Gemini Sovereign Mode and the 4-model periodic-table development governance (`Argon` / `Carbon` / `Hydrogen` / `Gemini 3.8 Flash`).
+    - Extend `test/prover.test.ts` and `test/phase2.test.ts` to verify per-lane model routing and reject `carbon-low` while allowing approved `gemini-4-carbon-high` and `gemini-4-hydrogen-xhigh` tokens.
+  - **Do Not**: Add external dependencies or weaken fail-closed prover invariants.
+  - **Local Verification**: `npm run check`, `npm test`, and `atlas-sync.sh --check-repos` all exit `0`.
+
 ### Acceptance Criteria
 1. `npm run check` (exits `0`)
 2. `npm test` (exits `0`)

@@ -130,13 +130,45 @@ test('Gemini REST ignores thinking parts but requires verdict text and rejects t
     ['extra proof key', [{ text: JSON.stringify({ ...blocker, proof: { ...blocker.proof, extra: true } }) }], 'ERROR'],
   ] as const) {
     await t.test(label, async (t) => {
-      t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ candidates: [
-        { finishReason: 'STOP', content: { parts } },
-      ] }), { headers: { 'content-type': 'application/json' } }));
+      const requestedUrls: string[] = [];
+      t.mock.method(globalThis, 'fetch', async (input: unknown) => {
+        requestedUrls.push(String(input));
+        return new Response(JSON.stringify({ candidates: [
+          { finishReason: 'STOP', content: { parts } },
+        ] }), { headers: { 'content-type': 'application/json' } });
+      });
       const result = await runProver(evidence);
       assert.equal(result.status, expected);
+      assert.equal(result.mode, 'gemini');
+      assert.equal(result.lanes.argonArchitect.model, 'gemini-4-argon-high');
+      assert.equal(result.lanes.geminiRedTeam.model, 'gemini-4-hydrogen-xhigh');
+      assert.deepEqual(requestedUrls.sort(), [
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-4-argon-high:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-4-hydrogen-xhigh:generateContent',
+      ]);
     });
   }
+  await t.test('vertex backend routes argonArchitect and geminiRedTeam to orthogonal Gemini 4 models', async (t) => {
+    environment(t, {
+      ATLAS_GEMINI_BACKEND: 'vertex',
+      GOOGLE_CLOUD_PROJECT: 'atlas-sec-prod',
+      GOOGLE_CLOUD_LOCATION: 'us-central1',
+      GOOGLE_OAUTH_ACCESS_TOKEN: 'ya29.synthetic-vertex-token',
+    });
+    const requestedUrls: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (input: unknown) => {
+      requestedUrls.push(String(input));
+      return new Response(JSON.stringify({ candidates: [
+        { finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(pass) }] } },
+      ] }), { headers: { 'content-type': 'application/json' } });
+    });
+    const result = await runProver(evidence, { mode: 'gemini' });
+    assert.equal(result.status, 'PASS');
+    assert.deepEqual(requestedUrls.sort(), [
+      'https://us-central1-aiplatform.googleapis.com/v1/projects/atlas-sec-prod/locations/us-central1/publishers/google/models/gemini-4-argon-high:generateContent',
+      'https://us-central1-aiplatform.googleapis.com/v1/projects/atlas-sec-prod/locations/us-central1/publishers/google/models/gemini-4-hydrogen-xhigh:generateContent',
+    ]);
+  });
 });
 
 for (const { mode, lanes: [first, second] } of modes) {

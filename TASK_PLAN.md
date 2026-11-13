@@ -197,6 +197,16 @@ It protects enterprises worldwide against real-world **GCP × Firebase** cyberat
   - **Do Not**: Add external dependencies or weaken fail-closed prover invariants.
   - **Local Verification**: `npm run check`, `npm test`, and `atlas-sync.sh --check-repos` all exit `0`.
 
+- [x] **Task-19: v0.3.0 Autonomous Security & DX Blueprint (`--format blueprint`), GKE / Cloud SQL / Cloud Build L0 Expansion & Two-Tier Onboarding Scheme**
+  - **Target Files**: `package.json`, `SECURITY.md`, `ATLAS.md`, `README.md`, `src/cli.ts`, `src/graph/gcp-iam-parser.ts`, `src/report/formatter.ts`, `src/report/remediation.ts`, `test/graph.test.ts`, `test/cli.test.ts`, `TASK_PLAN.md`.
+  - **Scope**:
+    - Bump package version to `0.3.0` (`package.json`, `README.md`, `SECURITY.md`).
+    - Expand L0 Terraform & IAM analysis in `src/graph/gcp-iam-parser.ts` and `src/report/remediation.ts` to detect GKE node identity exposure (`gke/node-identity-exposure`), Cloud SQL `0.0.0.0/0` public network exposure (`sql/public-authorized-network` with confirmed attack path and review-only diff), Cloud SQL unencrypted public IPv4 (`sql/unencrypted-public-ip`), and Cloud Build default service account powerful role grants (`iam/default-service-account`).
+    - Implement `formatBlueprint` (`--format blueprint`) in `src/report/formatter.ts` and `src/cli.ts`, outputting an Executive Risk Summary, 30/60/90-Day Autonomous Remediation Roadmap, Control-Domain Prioritized Findings, Attack Paths, Review-Only Diffs, and the Two-Tier Execution Model (Tier 0 Free Self-Service ¥0 vs Tier 1 Optional 2-Hour Online Sprint ¥100,000).
+    - Document the new L0 rules, `--format blueprint`, and the Two-Tier Global OSS Onboarding Scheme in both English and Japanese sections of `README.md`.
+  - **Do Not**: Add external dependencies or new subdirectories, or mutate scanned files.
+  - **Local Verification**: `npm run check`, `npm test`, and `atlas-sync.sh --check-repos` all exit `0`.
+
 ### Acceptance Criteria
 1. `npm run check` (exits `0`)
 2. `npm test` (exits `0`)

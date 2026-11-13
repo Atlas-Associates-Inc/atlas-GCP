@@ -20,6 +20,9 @@ const advice: Record<string, string> = {
   'audit/impersonation-chain': 'Review the observed caller and service account delegation chain, remove unnecessary impersonation grants, and scope approved delegation to named identities and resources.',
   'audit/sensitive-data-access': 'Validate the observed data access against workload requirements, investigate unapproved access, and restrict resource permissions to the intended identities.',
   'scc/active-finding': 'Review the active Security Command Center finding and affected resource configuration, confirm the exposure, and apply a resource-specific remediation through the approved change process.',
+  'gke/node-identity-exposure': 'Configure workload_identity_config on the cluster and assign a dedicated, least-privilege service_account to every node pool instead of the default Compute Engine account.',
+  'sql/public-authorized-network': 'Remove 0.0.0.0/0 from authorized_networks and connect through Cloud SQL Auth Proxy, Private Service Connect, or private IP.',
+  'sql/unencrypted-public-ip': 'Set ssl_mode = "ENCRYPTED_ONLY" (or require_ssl = true) and disable public IPv4 (ipv4_enabled = false) where private connectivity is available.',
 };
 
 function readSource(root: string, file: string): string | undefined {
@@ -38,7 +41,7 @@ export function proposeRemediations(findings: Finding[], directory: string): Rem
     if (!description) continue;
     const proposal: Remediation = { findingId: finding.id, file: finding.location.file, description, diff: '', automatic: false };
     // Application-specific policy cannot safely be invented. Emit only exact, reviewable edits.
-    if (['firebase/public-read', 'firebase/public-write', 'gcp/public-ingress'].includes(finding.ruleId)) {
+    if (['firebase/public-read', 'firebase/public-write', 'gcp/public-ingress', 'sql/public-authorized-network'].includes(finding.ruleId)) {
       try {
         const file = finding.location.file;
         if (!sources.has(file)) {
@@ -60,6 +63,8 @@ export function proposeRemediations(findings: Finding[], directory: string): Rem
           if (finding.ruleId === 'gcp/public-ingress') {
             updated = line.replace(/\bINGRESS_TRAFFIC_ALL\b/g, 'INGRESS_TRAFFIC_INTERNAL_ONLY')
               .replace(/\bALLOW_ALL\b/g, 'ALLOW_INTERNAL_ONLY');
+          } else if (finding.ruleId === 'sql/public-authorized-network') {
+            updated = line.replace(/"0\.0\.0\.0\/0"/g, '"127.0.0.1/32"');
           } else {
             // Use source offsets so comments and quoted values on the line stay untouched.
             const code = strippedLines[finding.location.line - 1]

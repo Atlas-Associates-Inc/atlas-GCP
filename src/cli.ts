@@ -7,7 +7,7 @@ import { runStdioProxy } from './airlock/stdio-proxy.ts';
 import { buildMcpConfig, getAirlockProfile } from './airlock/profiles.ts';
 import { redactSecrets, sanitizeTelemetry } from './airlock/sanitizer.ts';
 import { runProver } from './prove/dual-prover.ts';
-import { formatTable, meetsThreshold } from './report/formatter.ts';
+import { formatBlueprint, formatTable, meetsThreshold } from './report/formatter.ts';
 import { proposeRemediations } from './report/remediation.ts';
 import { toSarif } from './report/sarif.ts';
 import type { AirlockProfileId, McpConfigClient, ProverMode, Severity } from './types.ts';
@@ -16,7 +16,7 @@ const version: string = JSON.parse(readFileSync(new URL('../package.json', impor
 const help = `Atlas Shield ${version}
 
 Usage:
-  atlas-shield audit <dir> [--format table|json|sarif]
+  atlas-shield audit <dir> [--format table|json|sarif|blueprint]
       [--fail-on blocker|high|medium] [--emit-patch]
       [--prove] [--prover-mode gemini|dual]
   atlas-shield airlock [--profile <name>] --upstream-cmd <cmd> [--upstream-arg <arg>...]
@@ -104,7 +104,7 @@ export async function main(args: string[]): Promise<number> {
     'prover-mode': { type: 'string', default: 'gemini' },
   } });
   if (positionals.length !== 1) throw new Error('audit requires exactly one directory.');
-  if (!['table', 'json', 'sarif'].includes(values.format!)) throw new Error('--format must be table, json or sarif.');
+  if (!['table', 'json', 'sarif', 'blueprint'].includes(values.format!)) throw new Error('--format must be table, json, sarif or blueprint.');
   if (!['blocker', 'high', 'medium'].includes(values['fail-on']!)) throw new Error('--fail-on must be blocker, high or medium.');
   if (!['gemini', 'dual'].includes(values['prover-mode']!)) throw new Error('--prover-mode must be gemini or dual.');
   const directory = resolve(positionals[0]);
@@ -114,9 +114,10 @@ export async function main(args: string[]): Promise<number> {
   const prover = values.prove && !incomplete ? await runProver(graph, { mode: values['prover-mode'] as ProverMode }) : undefined;
   const remediations = values['emit-patch'] ? proposeRemediations(graph.findings, directory) : [];
   const report = values.format === 'table' ? formatTable(graph, prover, remediations)
+    : values.format === 'blueprint' ? formatBlueprint(graph, prover, remediations)
     : JSON.stringify(JSON.parse(redactSecrets(JSON.stringify(values.format === 'sarif' ? toSarif(graph, version, prover, remediations)
       : { ...graph, ...(prover ? { prover } : {}), ...(values['emit-patch'] ? { remediations } : {}) }))), null, 2) + '\n';
-  process.stdout.write(values.format === 'table' ? redactSecrets(report) : report);
+  process.stdout.write(values.format === 'table' || values.format === 'blueprint' ? redactSecrets(report) : report);
   if (incomplete || prover?.status === 'ERROR') return 2;
   return prover?.status === 'BLOCKER' || meetsThreshold(graph, values['fail-on'] as Severity) ? 1 : 0;
 }

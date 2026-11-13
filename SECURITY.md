@@ -8,8 +8,8 @@
 
 | Version | Security support |
 | --- | --- |
-| `0.2.x` | Supported |
-| `< 0.2.0` | Unsupported |
+| `0.3.x` | Supported |
+| `< 0.3.0` | Unsupported |
 
 ### Reporting a Vulnerability
 
@@ -47,8 +47,8 @@ These documented limits alone do not establish a security bypass. A reproducible
 
 | バージョン | セキュリティサポート |
 | --- | --- |
-| `0.2.x` | サポート対象 |
-| `< 0.2.0` | サポート対象外 |
+| `0.3.x` | サポート対象 |
+| `< 0.3.0` | サポート対象外 |
 
 ### 脆弱性の報告
 

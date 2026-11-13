@@ -339,3 +339,21 @@ test('package explicitly includes only distribution files and action run uses an
   assert.match(runBlocks[0][0], /node "\$GITHUB_ACTION_PATH\/bin\/atlas-shield\.mjs" audit/);
   assert.match(runBlocks[0][0], /--format="\$ATLAS_FORMAT" --fail-on="\$ATLAS_FAIL_ON" -- "\$ATLAS_DIRECTORY"/);
 });
+
+test('--format blueprint emits executive roadmap, control domains, diffs and execution tiers', () => {
+  const clean = cli(['audit', hardened, '--format', 'blueprint']);
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.match(clean.stdout, /# Atlas Shield — Autonomous Security & DX Blueprint/);
+  assert.match(clean.stdout, /No findings in the analyzed inputs/);
+
+  const unsafe = cli(['audit', vulnerable, '--format', 'blueprint', '--emit-patch']);
+  assert.equal(unsafe.status, 1, unsafe.stderr);
+  assert.match(unsafe.stdout, /## 1\. Executive Risk Summary/);
+  assert.match(unsafe.stdout, /## 2\. Autonomous 30 \/ 60 \/ 90-Day Remediation Roadmap/);
+  assert.match(unsafe.stdout, /## 3\. Prioritized Findings & Control Domains/);
+  assert.match(unsafe.stdout, /## 4\. Reachable Cross-Boundary Attack Paths/);
+  assert.match(unsafe.stdout, /## 5\. Review-Only Remediation Proposals/);
+  assert.match(unsafe.stdout, /```diff/);
+  assert.match(unsafe.stdout, /Tier 0 — Free Self-Service/);
+  assert.match(unsafe.stdout, /Tier 1 — Optional 2-Hour Online Implementation Sprint/);
+});

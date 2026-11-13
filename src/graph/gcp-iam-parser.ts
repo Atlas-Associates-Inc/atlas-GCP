@@ -3,14 +3,16 @@ import type { GraphResult } from '../types.ts';
 import { addFinding, buildBraceMap, createLineIndex, emptyGraph, stripHclCommentsAndHeredocs } from './firebase-rules-parser.ts';
 
 export const powerfulRoles = new Set(['roles/owner', 'roles/editor', 'roles/secretmanager.secretAccessor',
-  'roles/bigquery.dataEditor', 'roles/storage.admin']);
+  'roles/bigquery.dataEditor', 'roles/storage.admin', 'roles/cloudsql.admin', 'roles/container.admin']);
 export const escalationRoles = new Set(['roles/iam.serviceAccountUser', 'roles/iam.serviceAccountTokenCreator',
   'roles/iam.securityAdmin', 'roles/iam.serviceAccountAdmin', 'iam.serviceAccounts.actAs',
   'iam.serviceAccounts.getAccessToken', 'roles/iam.workloadIdentityUser',
-  'roles/iam.workloadIdentityPoolAdmin', 'iam.serviceAccounts.implicitDelegation']);
+  'roles/iam.workloadIdentityPoolAdmin', 'iam.serviceAccounts.implicitDelegation',
+  'roles/container.admin', 'roles/container.developer']);
 export const dataRoles: Record<string, string> = { 'roles/secretmanager.secretAccessor': 'Secret Manager secrets',
   'roles/bigquery.dataEditor': 'BigQuery datasets', 'roles/storage.admin': 'Cloud Storage objects',
   'roles/storage.objectViewer': 'Cloud Storage objects', 'roles/datastore.user': 'Firestore data',
+  'roles/cloudsql.admin': 'Cloud SQL databases', 'roles/cloudsql.client': 'Cloud SQL databases',
   'roles/owner': 'Project administration', 'roles/editor': 'Project resources' };
 
 function identity(member: string): string {
@@ -25,7 +27,7 @@ function addGrant(graph: GraphResult, file: string, line: number, member: string
   const findings: string[] = [];
   const evidence = `${member} -> ${role} on ${scope}${conditional ? ' (conditional)' : ''}`;
   graph.nodes.push({ id: from, kind: external ? 'entry' : 'identity', label: member, location: { file, line } });
-  if (/^(?:serviceAccount:)?(?:[^@]+-compute@developer\.gserviceaccount\.com|[^@]+@appspot\.gserviceaccount\.com)$/.test(member) && powerfulRoles.has(role)) {
+  if (/^(?:serviceAccount:)?(?:[^@]+-compute@developer\.gserviceaccount\.com|[^@]+@appspot\.gserviceaccount\.com|[^@]+@cloudbuild\.gserviceaccount\.com)$/.test(member) && powerfulRoles.has(role)) {
     findings.push(addFinding(graph, file, line, 'iam/default-service-account', 'high',
       'Default service account has a powerful role', `${role} is granted to a default service account; use a dedicated identity with only required permissions.`, evidence).id);
   }
@@ -239,6 +241,58 @@ export function parseTerraform(source: string, file: string): GraphResult {
       if (ingress === 'INGRESS_TRAFFIC_ALL' || ingress === 'ALLOW_ALL') addFinding(graph, file,
         lineIndex(resource.offset + ingressAttribute!.offset), 'gcp/public-ingress', 'medium',
         'Service permits external ingress', 'External ingress is enabled. Authentication policy must be checked separately; this does not prove public access.', `ingress = ${ingress}`);
+    }
+    if (type === 'google_container_cluster' || type === 'google_container_node_pool') {
+      graph.nodes.push({ id, kind: 'resource', label: `${type}.${resource.name}`, location: { file, line } });
+      const account = value(attributes, 'service_account', true);
+      const principal = account && account !== 'default' ? serviceIdentity(account, module, accounts) : undefined;
+      if (principal) {
+        graph.nodes.push({ id: principal, kind: 'identity', label: principal.replace(/^identity:/, '') });
+        graph.edges.push({ id: `${id}:runtime`, from: id, to: principal, kind: 'potential-runtime-identity-access', findingIds: [],
+          evidence: 'GKE node pool declares this node service account; pod compromise or metadata access is required to use its credentials.', confidence: 'potential' });
+      }
+      const scopesRaw = attr(attributes, 'oauth_scopes', true)?.raw ?? '';
+      const broadScopes = /cloud-platform/.test(scopesRaw);
+      const workloadPool = value(attributes, 'workload_pool', true);
+      const missingWi = type === 'google_container_cluster' && !workloadPool && (broadScopes || account === 'default' || /\bnode_config\s*\{/.test(body));
+      if (account === 'default' || (!principal && broadScopes) || missingWi) {
+        const evidence = account === 'default' ? 'service_account = "default"'
+          : broadScopes ? 'oauth_scopes includes cloud-platform without dedicated service_account'
+          : 'Missing workload_identity_config.workload_pool';
+        addFinding(graph, file, line, 'gke/node-identity-exposure', 'high',
+          'GKE nodes use default service account or broad OAuth scopes without Workload Identity',
+          'GKE node pools using the default Compute Engine service account or cloud-platform OAuth scope without Workload Identity expose node credentials to workloads; bind pods via Workload Identity and a dedicated least-privilege node service account.',
+          evidence);
+      }
+    }
+    if (type === 'google_sql_database_instance') {
+      const dataId = `data:${id}:Cloud SQL database`;
+      graph.nodes.push({ id, kind: 'resource', label: `${type}.${resource.name}`, location: { file, line } },
+        { id: dataId, kind: 'data', label: `Cloud SQL database in ${type}.${resource.name}`, location: { file, line } });
+      const publicNetMatch = /\bauthorized_networks\s*\{[\s\S]*?\bvalue\s*=\s*"0\.0\.0\.0\/0"/.exec(body);
+      if (publicNetMatch) {
+        const cidrOffset = body.indexOf('"0.0.0.0/0"', publicNetMatch.index);
+        const cidrLine = lineIndex(resource.offset + (cidrOffset >= 0 ? cidrOffset : publicNetMatch.index));
+        const finding = addFinding(graph, file, cidrLine, 'sql/public-authorized-network', 'blocker',
+          'Cloud SQL instance allows connections from 0.0.0.0/0',
+          'authorized_networks includes 0.0.0.0/0, exposing the database endpoint to all IPv4 addresses; use Cloud SQL Auth Proxy or private IP connectivity.',
+          'value = "0.0.0.0/0"');
+        const entry = 'entry:sql:0.0.0.0/0';
+        graph.nodes.push({ id: entry, kind: 'entry', label: '0.0.0.0/0', location: { file, line: cidrLine } });
+        graph.edges.push({ id: `${file}:${cidrLine}:${entry}:${dataId}`, from: entry, to: dataId,
+          kind: 'public-sql-network', findingIds: [finding.id], evidence: finding.evidence, confidence: 'confirmed' });
+      }
+      const ipv4Attr = attr(attributes, 'ipv4_enabled', true);
+      if (ipv4Attr && ipv4Attr.raw === 'true') {
+        const requireSsl = attr(attributes, 'require_ssl', true)?.raw === 'true';
+        const sslMode = value(attributes, 'ssl_mode', true);
+        if (!requireSsl && sslMode !== 'ENCRYPTED_ONLY' && sslMode !== 'TRUSTED_CLIENT_CERTIFICATE_REQUIRED') {
+          addFinding(graph, file, lineIndex(resource.offset + ipv4Attr.offset), 'sql/unencrypted-public-ip', 'high',
+            'Cloud SQL instance enables public IPv4 without enforced TLS',
+            'Public IPv4 connectivity is enabled without require_ssl = true or an encrypted ssl_mode; enforce TLS and prefer private IP.',
+            'ipv4_enabled = true');
+        }
+      }
     }
     if (type === 'google_iam_workload_identity_pool_provider') {
       const issuer = value(attributes, 'issuer_uri', true), condition = value(attributes, 'attribute_condition');

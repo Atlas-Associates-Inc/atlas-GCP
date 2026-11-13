@@ -934,3 +934,48 @@ test('Terraform email, id and name references correlate runtime identities acros
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('GKE node identity exposure, Cloud SQL 0.0.0.0/0 paths and Cloud Build default SA grants are detected and remediated', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-shield-gke-sql-'));
+  const source = [
+    'resource "google_container_cluster" "primary" {',
+    '  name = "primary"',
+    '  node_config {',
+    '    oauth_scopes = ["https://www.googleapis.com/auth/cloud-platform"]',
+    '  }',
+    '}',
+    'resource "google_sql_database_instance" "main_db" {',
+    '  name = "main-db"',
+    '  settings {',
+    '    ip_configuration {',
+    '      ipv4_enabled = true',
+    '      authorized_networks {',
+    '        value = "0.0.0.0/0"',
+    '      }',
+    '    }',
+    '  }',
+    '}',
+    'resource "google_project_iam_member" "cb_admin" {',
+    '  project = "fixture-project"',
+    '  role = "roles/cloudsql.admin"',
+    '  member = "serviceAccount:123456789@cloudbuild.gserviceaccount.com"',
+    '}',
+  ].join('\n') + '\n';
+  try {
+    writeFileSync(join(directory, 'main.tf'), source);
+    const graph = scanDirectory(directory);
+    const ruleIds = new Set(graph.findings.map(finding => finding.ruleId));
+    assert.ok(ruleIds.has('gke/node-identity-exposure'));
+    assert.ok(ruleIds.has('sql/public-authorized-network'));
+    assert.ok(ruleIds.has('sql/unencrypted-public-ip'));
+    assert.ok(ruleIds.has('iam/default-service-account'));
+    assert.ok(graph.paths.some(path => path.nodes[0] === 'entry:sql:0.0.0.0/0'
+      && path.description.includes('Cloud SQL database in google_sql_database_instance.main_db')
+      && path.confidence === 'confirmed' && path.severity === 'blocker'));
+    const proposals = proposeRemediations(graph.findings, directory);
+    const sqlDiff = proposals.find(item => item.diff.includes('127.0.0.1/32'));
+    assert.ok(sqlDiff, 'Expected review-only diff for 0.0.0.0/0 authorized_networks');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

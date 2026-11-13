@@ -1,21 +1,21 @@
-# Atlas Shield v0.2.1
+# Atlas Shield v0.3.0
 
-Offline GCP × Firebase attack-path analysis, a read-only MCP Airlock, and optional AI evidence review for enterprise security teams. GCP × Firebase の攻撃経路をオフラインで解析し、読み取り専用 MCP Airlock と任意の AI 証拠レビューを提供します。
+Offline GCP × Firebase attack-path analysis, autonomous 30/60/90-day remediation blueprints (`--format blueprint`), a read-only MCP Airlock, and optional Sovereign AI evidence review for enterprise engineering and security teams. GCP × Firebase の攻撃経路をオフラインで解析し、自律改修ブループリント（`--format blueprint`）、読み取り専用 MCP Airlock、任意の AI 証拠レビューを提供します。
 
 [English](#english) · [日本語](#日本語)
 
-- **Apache-2.0** — open source / オープンソース
+- **Apache-2.0** — open source, free self-service (`¥0`) / オープンソース・完全無料自走（`¥0`）
 - **Node.js >=22.18.0** — native erasable TypeScript / ネイティブ実行可能な erasable TypeScript
 - **0 npm dependencies** — runtime and development / 実行時・開発時ともに依存パッケージなし
-- **Read-only & offline by default** — local audit / ローカル監査は既定で読み取り専用・オフライン
+- **Read-only & offline by default** — zero cloud credentials required for local audit / ローカル監査は既定で読み取り専用・オフライン（クラウド認証情報不要）
 
 ```mermaid
 flowchart LR
-  inputs["L0: Static and exported telemetry inputs"] --> graph["Unified Attack Graph"]
-  graph --> reports["Table / JSON / SARIF v2.1.0 and review-only diffs (stdout)"]
+  inputs["L0: Terraform (Cloud Run, GKE, Cloud SQL, IAM, WIF), Firebase Rules, Audit & SCC"] --> graph["Unified Attack Graph"]
+  graph --> reports["Table / Blueprint (30-60-90d Roadmap) / JSON / SARIF v2.1.0 & review-only diffs (stdout)"]
   client["L1: MCP Client"] <--> airlock["Stdio JSON-RPC 2.0 Read-Only Airlock: 7 profiles and secret/injection sanitizer"]
   airlock <--> upstream["Caller-installed upstream MCP server"]
-  evidence["L2: Sanitized evidence (--prove)"] --> passes["Independent Prover passes: gemini or dual"]
+  evidence["L2: Sanitized evidence (--prove)"] --> passes["Independent Prover passes: gemini (Argon High x Hydrogen XHigh) or dual"]
   passes --> gate["Non-Majority Fail-Closed Gate: BLOCKER / ERROR / PASS"]
 ```
 
@@ -55,7 +55,9 @@ flowchart LR
 
 ### Why Atlas Shield
 
-Isolated scanners can identify an exposed resource without connecting it to the identity and permissions that make the exposure consequential. Atlas Shield correlates supported evidence across GCP × Firebase boundaries: public Firebase Rules, Cloud Run exposure, or Workload Identity Federation (WIF) can form entry points into paths involving runtime or federated identities, IAM privilege escalation, and access to Secret Manager, BigQuery, or Cloud Storage. The graph distinguishes observed or statically established relationships from `potential` transitions that depend on application behavior or deployment context.
+Isolated scanners can identify an exposed resource without connecting it to the identity and permissions that make the exposure consequential. Atlas Shield correlates supported evidence across GCP × Firebase boundaries: public Firebase Rules, Cloud Run exposure, GKE node identity exposure, Cloud SQL public networks (`0.0.0.0/0` or unencrypted public IPv4), or Workload Identity Federation (WIF) can form entry points into paths involving runtime or federated identities (including Compute Engine, App Engine, and Cloud Build default service accounts), IAM privilege escalation, and access to Secret Manager, BigQuery, Cloud SQL, or Cloud Storage. The graph distinguishes observed or statically established relationships from `potential` transitions that depend on application behavior or deployment context.
+
+With `--format blueprint --emit-patch`, any enterprise engineering team can feed this repository directly to their internal AI coding agent to generate an executive risk summary, a 30/60/90-day remediation roadmap, and review-only unified diffs offline in seconds—replacing multi-month external consulting assessments.
 
 AI SecOps adds another boundary: an assistant may receive hostile cloud logs or invoke tools with excessive privileges. The MCP Airlock mechanically restricts forwarded requests through fail-closed tool-name policies, while secret redaction and injection sanitization prepare untrusted telemetry for review. These controls have explicit limits; they do not establish that an upstream program is trustworthy or that every model instruction attack is neutralized.
 
@@ -65,6 +67,7 @@ Use this checkout with Node.js **>=22.18.0**; no install or build step is requir
 
 ```sh
 node bin/atlas-shield.mjs audit .
+node bin/atlas-shield.mjs audit /path/to/repository --format blueprint --emit-patch
 node bin/atlas-shield.mjs audit /path/to/repository --format sarif
 node bin/atlas-shield.mjs audit /path/to/repository --format json --emit-patch
 node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
@@ -78,7 +81,7 @@ npm package publication has **not been verified**. Once a trusted release is ava
 npx @atlas-sec/shield audit .
 ```
 
-Defaults are `--format table`, `--fail-on high`, and `--prover-mode gemini`. Formats are `table|json|sarif`; failure thresholds are `blocker|high|medium`. Reports and proposed changes go to `stdout` only. `--emit-patch` includes review-only unified diffs in the selected report format; it never applies them or modifies target files or cloud resources.
+Defaults are `--format table`, `--fail-on high`, and `--prover-mode gemini`. Formats are `table|json|sarif|blueprint`; failure thresholds are `blocker|high|medium`. Reports and proposed changes go to `stdout` only. `--format blueprint` emits a structured Markdown executive risk summary, a 30/60/90-day autonomous remediation roadmap, prioritized findings mapped to control domains, reachable cross-boundary attack paths, and review-only diffs when combined with `--emit-patch`. `--emit-patch` includes review-only unified diffs in the selected report format; it never applies them or modifies target files or cloud resources.
 
 | Exit code | Meaning |
 | --- | --- |
@@ -86,11 +89,38 @@ Defaults are `--format table`, `--fail-on high`, and `--prover-mode gemini`. For
 | `1` | Findings or paths meet the selected threshold, or the prover returns `BLOCKER`. |
 | `2` | Invalid arguments, an incomplete scan, prover `ERROR`, or proxy failure. Incomplete scans and prover errors take precedence over threshold findings. |
 
+### Autonomous Enterprise AI Playbook & 2-Hour Online Sprint
+
+Enterprise staff can load this repository into their own company's AI agent (such as Gemini CLI, Antigravity, or Vertex AI) to execute a complete 4-step cloud & AI hardening loop internally for **¥0**, or optionally book a **2-Hour Online Implementation Sprint** (`¥100,000` in Japan / `$750` globally) for guided completion.
+
+**Copy-Paste Prompt for Your In-House Enterprise AI Agent (`Tier 0 — ¥0`)**
+
+```text
+Read ATLAS.md and README.md in this Atlas Shield repository, then execute the following 4 steps strictly in read-only / review-first mode against our target repository (<TARGET_REPO_PATH>):
+1. Run `node bin/atlas-shield.mjs mcp-config --client gemini` and present the read-only MCP Airlock wrapper configuration for our cloud/security tools.
+2. Run `node bin/atlas-shield.mjs audit <TARGET_REPO_PATH> --format blueprint --emit-patch` and present the Executive Risk Summary, the 30/60/90-Day Autonomous Remediation Roadmap, and all reachable cross-boundary attack paths.
+3. Explain each review-only unified diff proposed by `--emit-patch` (Firebase Rules, Terraform Cloud Run/Cloud SQL/GKE, IAM least privilege, and GitHub Actions WIF pinning) and wait for human approval before applying any file edits.
+4. Prepare a pull-request CI workflow using `uses: ./` with `fail-on: high` so future regressions are blocked deterministically.
+```
+
+| Tier | Cost | Target Audience & Scope | Cloud Credential Requirement |
+| --- | --- | --- | --- |
+| **Tier 0: Free Self-Service (Apache-2.0)** | **¥0 / Free** | Organizations whose internal engineers and AI agents run the 4-step playbook, apply the review-only patches, and enable the CI gate independently. | **Zero** (100% offline local static & exported-telemetry analysis) |
+| **Tier 1: Optional 2-Hour Online Implementation Sprint** | **¥100,000 (JP) / $750 (Global)** | Teams that want rapid, guided execution after running the free scan: complete attack-path triage, MCP Airlock wiring, least-privilege patch verification, and CI gate rollout in a single 2-hour online session. | **Zero** (screen-share only the redacted `--format blueprint` Markdown output; no live cloud keys or production access ever handed over) |
+
+**2-Hour Online Implementation Sprint Agenda (`Tier 1`)**
+
+| Time Window | Phase | Deliverable |
+| --- | --- | --- |
+| `00:00–00:40` | **1. Blueprint Triage & Attack-Path Prioritization** | Walk through your `--format blueprint` output, prioritizing confirmed cross-boundary attack paths (`blocker` and `high`) across Firebase, Cloud Run, GKE, Cloud SQL, IAM, and GitHub WIF. |
+| `00:40–01:30` | **2. Least-Privilege Patch Review & MCP Airlock Setup** | Review and tailor the proposed `--emit-patch` diffs for your production architecture and wire read-only MCP Airlock wrappers (`mcp-config`) for your internal AI agents. |
+| `01:30–02:00` | **3. CI Regression Gate & 30/60/90-Day Handover** | Enable the GitHub Actions pull-request gate (`audit` exit `0` verification) and finalize the 30/60/90-day internal operation playbook so your team runs autonomously with zero ongoing consulting retainer. |
+
 ### L0: Deterministic Cross-Boundary Attack Graph
 
 `audit` reads supported local inputs into a unified directed graph. Without `--prove`, analysis is offline, makes no network calls, and uses no model.
 
-Supported inputs are Firebase `firestore.rules` / `storage.rules` and `*.firestore.rules.sample` / `*.storage.rules.sample` files, Rules paths declared in `firebase.json`, Terraform `*.tf`, exported IAM policy JSON `*iam*.json` with IAM token/camelCase boundaries, GitHub Actions WIF workflows (`.github/workflows/*.yml` / `*.yaml` and WIF-named YAML files), exported Cloud Audit Logs, and exported SCC findings. Terraform and workflow extensions are case-insensitive.
+Supported inputs are Firebase `firestore.rules` / `storage.rules` and `*.firestore.rules.sample` / `*.storage.rules.sample` files, Rules paths declared in `firebase.json`, Terraform `*.tf` (covering Cloud Run, Cloud Functions, GKE `google_container_cluster` / `google_container_node_pool`, Cloud SQL `google_sql_database_instance`, IAM bindings, and GitHub Actions WIF providers), exported IAM policy JSON `*iam*.json` with IAM token/camelCase boundaries, GitHub Actions WIF workflows (`.github/workflows/*.yml` / `*.yaml` and WIF-named YAML files), exported Cloud Audit Logs, and exported SCC findings. Terraform and workflow extensions are case-insensitive.
 
 **Rule reference**
 
@@ -102,9 +132,12 @@ Supported inputs are Firebase `firestore.rules` / `storage.rules` and `*.firesto
 | `firebase/privilege-fields` | `medium` | Authenticated user-document writes lack a recognized field allowlist; application trust and validation need review. |
 | `gcp/public-service` | `high` | Public IAM grants to `allUsers` or `allAuthenticatedUsers`. |
 | `gcp/public-ingress` | `medium` | External service ingress is enabled; this alone does not prove unauthenticated access. |
-| `iam/default-service-account` | `high` | A default service account holds a recognized powerful role. |
+| `iam/default-service-account` | `high` | A default Compute Engine, App Engine, or Cloud Build service account holds a recognized powerful role. |
 | `iam/privilege-escalation` | `high` | Recognized service-account or IAM escalation capabilities; scope, conditions, and prerequisites need review. |
 | `wif/unpinned-provider` | `high` | A GitHub WIF provider lacks a recognized mandatory literal repository restriction. Workflow authentication declarations also add `potential` edges, without proving provider trust. |
+| `gke/node-identity-exposure` | `high` | GKE clusters or node pools use the default service account or broad `cloud-platform` OAuth scopes without Workload Identity. |
+| `sql/public-authorized-network` | `blocker` | Cloud SQL `authorized_networks` includes `0.0.0.0/0`, exposing the database endpoint to all IPv4 addresses. |
+| `sql/unencrypted-public-ip` | `high` | Cloud SQL enables public IPv4 (`ipv4_enabled = true`) without `require_ssl = true` or an encrypted `ssl_mode`. |
 | `audit/logging-tampering` | `blocker` / `high` | Logging sink deletion/disablement or audit configuration removal; suspicious exclusion changes. |
 | `audit/iam-persistence` | `high` | Service-account key creation, insufficiently constrained WIF provider changes, or powerful/public IAM grants. |
 | `audit/impersonation-chain` | `high` | Supported credential issuance, token exchange, or delegation chains involving suspicious callers. |
@@ -240,7 +273,9 @@ Test files run sequentially so deterministic wall-clock parser budgets do not co
 
 ### なぜ Atlas Shield か
 
-個別のスキャナーでは、公開されたリソースを検出できても、その影響を決める ID と権限のつながりを見落とす場合があります。Atlas Shield は、GCP × Firebase の境界をまたぐ対応済みの証拠を関連付けます。公開された Firebase Rules、Cloud Run、Workload Identity Federation（WIF）を入口として、実行 ID またはフェデレーション ID、IAM 権限昇格、Secret Manager・BigQuery・Cloud Storage へのアクセスに至る経路を扱います。グラフでは、観測済みまたは静的に確認できた関係と、アプリケーションの動作やデプロイ環境に依存する `potential` な遷移を区別します。
+個別のスキャナーでは、公開されたリソースを検出できても、その影響を決める ID と権限のつながりを見落とす場合があります。Atlas Shield は、GCP × Firebase の境界をまたぐ対応済みの証拠を関連付けます。公開された Firebase Rules、Cloud Run、GKE ノード ID の露出、Cloud SQL の全公開ネットワーク（`0.0.0.0/0` または非暗号化公開 IPv4）、Workload Identity Federation（WIF）を入口として、実行 ID またはフェデレーション ID（Compute Engine、App Engine、Cloud Build の既定サービスアカウントを含む）、IAM 権限昇格、Secret Manager・BigQuery・Cloud SQL・Cloud Storage へのアクセスに至る経路を扱います。グラフでは、観測済みまたは静的に確認できた関係と、アプリケーションの動作やデプロイ環境に依存する `potential` な遷移を区別します。
+
+さらに `--format blueprint --emit-patch` を使うことで、各企業の担当者が本リポジトリを自社の AI コーディングエージェントに読み込ませ、経営・情シス向けのリスク要約、30/60/90日の自律改修ロードマップ、およびレビュー専用の修正 diff をオフラインかつ数秒で自動生成できます。これにより、従来数ヶ月を要した高額な外部コンサルティング診断を内製化できます。
 
 AI SecOps には別の境界もあります。アシスタントは攻撃用の指示を含むクラウドログを受け取ったり、過剰な権限を持つツールを呼び出したりする可能性があります。MCP Airlock は、安全側に拒否するツール名ポリシーで転送要求を機械的に制限し、秘密情報の除去とインジェクションのサニタイズによって、信頼できないテレメトリーをレビュー可能な形にします。これらの制御には限界があり、上流プログラムの信頼性や、モデルへのあらゆる指示攻撃の無効化を証明するものではありません。
 
@@ -250,6 +285,7 @@ Node.js **>=22.18.0** で、この checkout から実行できます。インス
 
 ```sh
 node bin/atlas-shield.mjs audit .
+node bin/atlas-shield.mjs audit /path/to/repository --format blueprint --emit-patch
 node bin/atlas-shield.mjs audit /path/to/repository --format sarif
 node bin/atlas-shield.mjs audit /path/to/repository --format json --emit-patch
 node bin/atlas-shield.mjs audit fixtures/hardened-enterprise
@@ -263,7 +299,7 @@ npm パッケージの公開状況は**未確認**です。信頼できるリリ
 npx @atlas-sec/shield audit .
 ```
 
-既定値は `--format table`、`--fail-on high`、`--prover-mode gemini` です。出力形式は `table|json|sarif`、失敗とする重大度のしきい値は `blocker|high|medium` から選択します。レポートと変更案は `stdout`（標準出力）のみに出力します。`--emit-patch` は選択した形式のレポートにレビュー専用の unified diff を含めますが、適用は行わず、対象ファイルやクラウドリソースを変更しません。
+既定値は `--format table`、`--fail-on high`、`--prover-mode gemini` です。出力形式は `table|json|sarif|blueprint`、失敗とする重大度のしきい値は `blocker|high|medium` から選択します。レポートと変更案は `stdout`（標準出力）のみに出力します。`--format blueprint` は、経営・情シス向けリスク要約、30/60/90日の自律改修ロードマップ、統制ドメイン別の優先指摘一覧、到達可能なクロス境界攻撃経路、および `--emit-patch` 併用時のレビュー専用 diff を構造化 Markdown として出力します。`--emit-patch` は選択した形式のレポートにレビュー専用の unified diff を含めますが、適用は行わず、対象ファイルやクラウドリソースを変更しません。
 
 | 終了コード | 意味 |
 | --- | --- |
@@ -271,11 +307,38 @@ npx @atlas-sec/shield audit .
 | `1` | 指定しきい値以上の指摘または経路がある、または Prover が `BLOCKER` を返した。 |
 | `2` | 引数不正、不完全な走査、Prover の `ERROR`、またはプロキシ障害。不完全な走査と Prover のエラーは、しきい値以上の指摘より優先される。 |
 
+### 自社AIによる自律導入プレイブックと2時間オンライン実装スプリント
+
+各企業の担当者は、本リポジトリを自社の AI エージェント（Gemini CLI、Antigravity、Vertex AI 等）に読み込ませることで、**完全無料（¥0）**で4ステップの内製強化ループを完結できます。また、無料スキャン実行後にプロと伴走して一気に定着させたい企業向けに、任意の**2時間オンライン実装スプリント**（日本：`¥100,000`／海外：`$750`）も提供します。
+
+**自社AIエージェントへのコピペ用プロンプト（`Tier 0 — ¥0 完全自走`）**
+
+```text
+この Atlas Shield リポジトリの ATLAS.md と README.md を読み込み、自社の対象リポジトリ（<TARGET_REPO_PATH>）に対して、必ず読み取り専用・レビュー優先モードで以下の4ステップを実行してください。
+1. `node bin/atlas-shield.mjs mcp-config --client gemini` を実行し、社内クラウド／セキュリティツール向けの読み取り専用 MCP Airlock ラッパー設定を提示すること。
+2. `node bin/atlas-shield.mjs audit <TARGET_REPO_PATH> --format blueprint --emit-patch` を実行し、Executive Risk Summary（経営・情シス要約）、30/60/90日の自律改修ロードマップ、および到達可能なすべてのクロス境界攻撃経路を提示すること。
+3. `--emit-patch` が提案したレビュー専用の unified diff（Firebase Rules、Terraform Cloud Run/Cloud SQL/GKE、IAM 最小権限化、GitHub Actions WIF リポジトリ固定）を1件ずつ解説し、人間の承認を得るまでファイル変更を適用しないこと。
+4. 今後の設定退行を決定論的にブロックするため、`uses: ./`（`fail-on: high`）を用いた Pull Request CI ワークフロー案を作成すること。
+```
+
+| プラン | 料金 | 対象・導入範囲 | クラウド認証情報の引き渡し |
+| --- | --- | --- | --- |
+| **Tier 0: 完全自走コース（Apache-2.0）** | **¥0（完全無料）** | 社内のエンジニアと自社 AI エージェントで4ステップのプレイブックを実行し、修正パッチ適用から CI ゲート導入までを自走するすべての企業。 | **一切不要**（100% オフラインのローカル静的・エクスポート済みテレメトリー解析） |
+| **Tier 1: 2時間オンライン実装スプリント（任意）** | **¥100,000（日本）／ $750（海外）** | 無料スキャン実行後、プロと伴走して2時間で攻撃経路の優先度確定・MCP Airlock 接続・最小権限パッチ確認・CI ゲート稼働までを一気に完了させたい企業。 | **一切不要**（秘密情報マスク済みの `--format blueprint` Markdown 出力のみを画面共有。本番アクセス権や鍵の預託はゼロ） |
+
+**2時間オンライン実装スプリント Timebox アジェンダ（`Tier 1`）**
+
+| 時間枠 | フェーズ | 完了成果物（Deliverable） |
+| --- | --- | --- |
+| `00:00–00:40` | **1. Blueprint トリアージと攻撃経路の優先度確定** | `--format blueprint` の出力をもとに、Firebase・Cloud Run・GKE・Cloud SQL・IAM・GitHub WIF をまたぐ到達可能な攻撃経路（`blocker` / `high`）の遮断順序を確定。 |
+| `00:40–01:30` | **2. 最小権限パッチ検証と MCP Airlock 配線** | `--emit-patch` の修正 diff を自社本番構成に合わせてレビュー・調整し、社内 AI エージェント向けに読み取り専用 MCP Airlock（`mcp-config`）を接続。 |
+| `01:30–02:00` | **3. CI 退行防止ゲート稼働と 30/60/90日自走移管** | GitHub Actions の PR ゲート（`audit` 終了コード `0` の検証）を有効化し、翌日から外部コンサル契約なしで自走運用できる 30/60/90日プレイブックを移管。 |
+
 ### L0: 決定論的クロス境界攻撃グラフ
 
 `audit` は対応するローカル入力を読み込み、統合された有向グラフを構築します。`--prove` を指定しなければオフラインで解析し、ネットワーク通信もモデルも使用しません。
 
-対応入力は、Firebase の `firestore.rules` / `storage.rules` と `*.firestore.rules.sample` / `*.storage.rules.sample`、`firebase.json` に宣言された Rules パス、Terraform の `*.tf`、IAM の単語・camelCase 境界を持つエクスポート済み IAM ポリシー JSON `*iam*.json`、GitHub Actions の WIF ワークフロー（`.github/workflows/*.yml` / `*.yaml` およびファイル名に WIF を含む YAML）、エクスポート済み Cloud Audit Logs、SCC findings です。Terraform とワークフローの拡張子は大文字・小文字を区別しません。
+対応入力は、Firebase の `firestore.rules` / `storage.rules` と `*.firestore.rules.sample` / `*.storage.rules.sample`、`firebase.json` に宣言された Rules パス、Terraform の `*.tf`（Cloud Run、Cloud Functions、GKE `google_container_cluster` / `google_container_node_pool`、Cloud SQL `google_sql_database_instance`、IAM バインディング、GitHub Actions WIF プロバイダーに対応）、IAM の単語・camelCase 境界を持つエクスポート済み IAM ポリシー JSON `*iam*.json`、GitHub Actions の WIF ワークフロー（`.github/workflows/*.yml` / `*.yaml` およびファイル名に WIF を含む YAML）、エクスポート済み Cloud Audit Logs、SCC findings です。Terraform とワークフローの拡張子は大文字・小文字を区別しません。
 
 **検出ルール一覧**
 
@@ -287,9 +350,12 @@ npx @atlas-sec/shield audit .
 | `firebase/privilege-fields` | `medium` | 認証済みユーザーによるユーザードキュメントへの書き込みに、認識可能なフィールド許可リストがない。アプリケーションの信頼境界と検証処理の確認が必要。 |
 | `gcp/public-service` | `high` | `allUsers` または `allAuthenticatedUsers` への公開 IAM 権限付与。 |
 | `gcp/public-ingress` | `medium` | サービスの外部 ingress が有効。これだけでは未認証アクセスを証明しない。 |
-| `iam/default-service-account` | `high` | 既定のサービスアカウントが、検出対象の強力なロールを保有。 |
+| `iam/default-service-account` | `high` | Compute Engine、App Engine、または Cloud Build の既定サービスアカウントが、検出対象の強力なロールを保有。 |
 | `iam/privilege-escalation` | `high` | 検出対象のサービスアカウント・IAM 権限昇格能力。適用範囲、条件、前提権限の確認が必要。 |
 | `wif/unpinned-provider` | `high` | GitHub WIF プロバイダーに、認識可能な必須のリテラルリポジトリ制約がない。ワークフローの認証宣言も `potential` な辺を追加するが、プロバイダーの信頼設定を証明しない。 |
+| `gke/node-identity-exposure` | `high` | GKE クラスタまたはノードプールが、Workload Identity なしで既定サービスアカウントまたは広範な `cloud-platform` OAuth スコープを使用。 |
+| `sql/public-authorized-network` | `blocker` | Cloud SQL の `authorized_networks` に `0.0.0.0/0` が含まれ、データベースエンドポイントが全 IPv4 アドレスに露出。 |
+| `sql/unencrypted-public-ip` | `high` | Cloud SQL で公開 IPv4（`ipv4_enabled = true`）が有効かつ `require_ssl = true` または暗号化 `ssl_mode` が未設定。 |
 | `audit/logging-tampering` | `blocker` / `high` | ログシンクの削除・無効化、監査設定の除去、または疑わしい除外設定の変更。 |
 | `audit/iam-persistence` | `high` | サービスアカウント鍵の作成、制約が不十分な WIF プロバイダー変更、または強力な権限・公開 IAM 権限の付与。 |
 | `audit/impersonation-chain` | `high` | 疑わしい呼び出し元が関与する、対応済みの認証情報発行・トークン交換・委任チェーン。 |
